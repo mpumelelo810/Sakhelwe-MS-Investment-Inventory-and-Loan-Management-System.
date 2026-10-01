@@ -1,0 +1,54 @@
+export const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Mbabane',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+export const money=n=>`E ${Number(n||0).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+export const round=n=>Math.round((n+Number.EPSILON)*100)/100;
+export const days=(a,b)=>Math.max(0,Math.round((new Date(b+'T12:00:00Z')-new Date(a+'T12:00:00Z'))/86400000));
+export const interest=(l,date=today())=>round(Number(l.principal)*Number(l.annual_rate)*days(l.accrued_through,date)/365);
+export const empty=()=>({role:'owner',products:[],customers:[],batches:[],events:[],invoices:[],policies:[],loans:[],journal:[]});
+export const account=(s,a,ids)=>s.journal.filter(j=>j.account===a&&(!ids||ids.has(j.event_id))).reduce((n,j)=>n+Number(j.debit)-Number(j.credit),0);
+export function totals(s,month,division='All sections'){
+ const es=s.events.filter(e=>e.business_date.startsWith(month)&&(division==='All sections'||e.division===division));const ids=new Set(es.map(e=>e.id));
+ const revenue=-account(s,'revenue',ids),earned=-account(s,'interest_income',ids),cost=account(s,'cost_of_sales',ids),expenses=account(s,'expenses',ids);
+ return{revenue,earned,cost,expenses,profit:revenue+earned-cost-expenses,cash:account(s,'cash'),reserve:account(s,'reserve'),debt:account(s,'receivables')+account(s,'principal')+account(s,'interest_receivable'),inventory:account(s,'inventory'),events:es};
+}
+export function demo(){
+ const s=empty(),dt=today();s.products=[{id:'chicken',name:'Whole chickens',unit:'each',division:'Poultry',threshold:10},{id:'pig',name:'Live pigs',unit:'each',division:'Pigs',threshold:3}];
+ s.customers=[{id:'c1',name:'Sample customer A',phone:''},{id:'c2',name:'Sample customer B',phone:''}];
+ demoPost(s,'capital',{date:dt,amount:'15000',description:'Sample opening capital'},'d1');
+ demoPost(s,'receive',{date:dt,amount:'6000',quantity:'100',product_id:'chicken',supplier:'Example supplier'},'d2');
+ demoPost(s,'receive',{date:dt,amount:'4800',quantity:'4',product_id:'pig',supplier:'Example supplier'},'d3');
+ demoPost(s,'sale',{date:dt,quantity:'28',pricing_quantity:'28',price:'95',paid:'2660',product_id:'chicken'},'d4');
+ demoPost(s,'sale',{date:dt,quantity:'1',pricing_quantity:'1',price:'1800',paid:'1000',customer_id:'c1',product_id:'pig'},'d5');
+ demoPost(s,'expense',{date:dt,amount:'350',division:'Poultry',description:'Sample feed and transport'},'d6');return s;
+}
+export function demoPost(s,k,p,key){
+ if(s.role==='analyst')throw Error('This account is read-only.');
+ const previous=s.events.find(e=>e.request_key===key);if(previous){if(previous.kind!==k||JSON.stringify(previous.payload)!==JSON.stringify(p))throw Error('Request key already used.');return previous.id;}
+ const dt=p.date;if(!dt||dt>today())throw Error('Choose today or an earlier date.');if(s.events.some(e=>e.business_date>dt))throw Error('Record entries in date order.');
+ const e={id:crypto.randomUUID(),request_key:key,kind:k,business_date:dt,division:'Business',description:p.description||k.replaceAll('_',' '),amount:Number(p.amount||0),payload:p,created_at:new Date().toISOString()};
+ const journal=(account,debit=0,credit=0)=>s.journal.push({event_id:e.id,account,debit:round(debit),credit:round(credit)});
+ let amount=Number(p.amount),prod=s.products.find(x=>x.id===p.product_id),q=Number(p.quantity);
+ if(['capital','receive','expense','loan','repay','invoice_payment','reserve'].includes(k)&&(!(amount>0)||round(amount)!==amount))throw Error('Enter a positive amount with at most two decimal places.');
+ if(['capital','reserve','loan','policy','product'].includes(k)&&s.role!=='owner')throw Error('Only the owner can perform this action.');
+ if(['receive','sale','loss'].includes(k)){if(!prod||!(q>0)||(prod.unit==='each'&&!Number.isInteger(q)))throw Error('Check the product and stock quantity.');e.division=prod.division;}
+ if(k==='product'){if(s.products.some(x=>x.name===p.name))throw Error('A product with this name already exists.');s.products.push({id:crypto.randomUUID(),name:p.name,unit:p.unit,division:p.division,threshold:Number(p.threshold)});}
+ else if(k==='customer')s.customers.push({id:crypto.randomUUID(),name:p.name,phone:p.phone});
+ else if(k==='policy'){if(p.approved!=='yes'||Number(p.annual_rate)<0||Number(p.annual_rate)>100)throw Error('Confirm the approved rate, between 0 and 100%.');s.policies.push({id:crypto.randomUUID(),name:p.name,annual_rate:Number(p.annual_rate)/100});}
+ else if(k==='capital'){journal('cash',amount);journal('capital',0,amount);}
+ else if(k==='receive'){s.batches.push({id:crypto.randomUUID(),event_id:e.id,product_id:prod.id,received_on:dt,supplier:p.supplier,quantity:q,total_cost:amount,remaining:q,remaining_cost:amount});journal('inventory',amount);journal('cash',0,amount);}
+ else if(k==='sale'||k==='loss'){
+  let need=q,cost=0;const batches=s.batches.filter(b=>b.product_id===prod.id&&b.remaining>0).sort((a,b)=>a.received_on.localeCompare(b.received_on)||a.id.localeCompare(b.id));
+  if(batches.reduce((n,b)=>n+Number(b.remaining),0)<q)throw Error('There is not enough stock.');
+  for(const b of batches){const take=Math.min(need,b.remaining),c=take===b.remaining?b.remaining_cost:round(b.remaining_cost*take/b.remaining);b.remaining-=take;b.remaining_cost=round(b.remaining_cost-c);cost+=c;need-=take;if(need===0)break;}
+  journal('inventory',0,cost);
+  if(k==='sale'){amount=round(Number(p.pricing_quantity)*Number(p.price));const paid=Number(p.paid);if(!(amount>0)||paid<0||paid>amount||(!p.customer_id&&paid<amount))throw Error('Check payment or select a customer for credit sales.');s.invoices.push({id:e.id,customer_id:p.customer_id||null,total:amount,paid});e.amount=amount;e.description=prod.name+' sale';journal('revenue',0,amount);journal('cash',paid);journal('receivables',amount-paid);journal('cost_of_sales',cost);}
+  else{if(!p.description?.trim())throw Error('Give a reason for the stock loss.');journal('expenses',cost);}
+ }
+ else if(k==='expense'){e.division=p.division;journal('expenses',amount);journal('cash',0,amount);}
+ else if(k==='reserve'){journal('reserve',amount);journal('cash',0,amount);}
+ else if(k==='invoice_payment'){const inv=s.invoices.find(x=>x.id===p.invoice_id);if(!inv||amount>inv.total-inv.paid)throw Error('Payment exceeds the invoice balance.');inv.paid=round(inv.paid+amount);journal('cash',amount);journal('receivables',0,amount);}
+ else if(k==='loan'){const policy=s.policies.find(x=>x.id===p.policy_id);if(!policy||!s.customers.some(x=>x.id===p.customer_id))throw Error('Select a customer and an approved loan policy.');if(s.loans.some(l=>l.customer_id===p.customer_id&&l.status==='active')||s.invoices.some(i=>i.customer_id===p.customer_id&&i.paid<i.total))throw Error('This customer must clear existing debt first.');if(p.due_on<dt)throw Error('Check the due date.');s.loans.push({id:e.id,customer_id:p.customer_id,policy_id:policy.id,principal:amount,original_amount:amount,interest:0,annual_rate:policy.annual_rate,accrued_through:dt,due_on:p.due_on,status:'active'});e.division='Loans';journal('principal',amount);journal('cash',0,amount);}
+ else if(k==='repay'||k==='accrue'){const l=s.loans.find(x=>x.id===p.loan_id&&x.status==='active');if(!l||dt<l.accrued_through)throw Error('Choose an active loan and valid date.');const earn=interest(l,dt);l.interest=round(l.interest+earn);journal('interest_income',0,earn);journal('interest_receivable',earn);if(k==='repay'){if(amount>l.principal+l.interest)throw Error('Payment exceeds the settlement balance.');const ip=Math.min(amount,l.interest),pp=round(amount-ip);l.interest=round(l.interest-ip);l.principal=round(l.principal-pp);journal('cash',amount);journal('interest_receivable',0,ip);journal('principal',0,pp);}l.accrued_through=dt;l.status=l.principal+l.interest===0?'settled':'active';e.division='Loans';}
+ else throw Error('Unknown transaction.');
+ if(account(s,'cash')<0)throw Error('There is not enough operating cash. Record capital first.');s.events.unshift(e);return e.id;
+}
+export function csv(rows){return rows.map(row=>row.map(x=>{let value=String(x??'');if(/^[=+@\-\t\r]/.test(value))value="'"+value;return '"'+value.replaceAll('"','""')+'"';}).join(',')).join('\r\n');}
