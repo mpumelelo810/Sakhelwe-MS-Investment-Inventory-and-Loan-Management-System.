@@ -111,3 +111,12 @@ Sakhelwe MS Investment needs a reliable way to manage chicken stock, pig stock a
 Sakhelwe Business Control (`hkwmhajogglgqvmxxrxs`) is provisioned on the free plan in eu-west-1. The initial schema is installed; all ten public Sakhelwe tables have RLS enabled and the security advisor returned no findings. The app includes the public project URL and publishable key as defaults; environment variables can override them. These are client configuration, never a service-role key.
 
 The owner Auth account and staff membership still need setup. Netlify deployment and authenticated save/reload verification remain pending. Do not enter business records in the sample workspace.
+
+
+## Offline device edition
+
+The build also produces `dist/Sakhelwe-Offline.html`: download and open the file in Chrome or Edge, select **Open offline device workspace**, then add products and opening capital under Settings. All scripts, styles and the original logo are embedded; no internet or server is required for the device workspace. Keep the file in the same folder and use the same browser profile. Real device entries are saved in IndexedDB transactionally. A failed save does not change the saved ledger.
+
+Download a full JSON backup in Settings regularly. Restore is allowed only into an empty workspace. Device data is not encrypted or password protected, and clearing browser data can remove it. Use your own protected device. Device records and cloud records are separate; there is no automatic synchronization. The standalone file is a browser application, not a Windows EXE or Android APK.
+
+The hosted edition includes a web manifest and a build-generated service worker for app-shell offline caching. Chrome/Edge can install it after a first online visit. First install and real service-worker offline loading still require verification on the published HTTPS site. Netlify authentication remains blocked in the agent browser.

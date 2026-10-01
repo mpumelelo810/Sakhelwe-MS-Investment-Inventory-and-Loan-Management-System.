@@ -1,5 +1,4 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';import {execFileSync} from 'node:child_process';import {readFile,readdir} from 'node:fs/promises';import {JSDOM} from 'jsdom';
-execFileSync(process.execPath,['node_modules/vite/bin/vite.js','build'],{cwd:new URL('..',import.meta.url),stdio:'pipe',env:{...process.env,VITE_SUPABASE_URL:'',VITE_SUPABASE_PUBLISHABLE_KEY:''}});
 const assets=await readdir(new URL('../dist/assets',import.meta.url)),bundle=await readFile(new URL('../dist/assets/'+assets.find(f=>f.endsWith('.js')),import.meta.url),'utf8');
 const tick=()=>new Promise(resolve=>setTimeout(resolve,60));
 test('built interface opens sample workspace, navigates all pages and records a delivery',async()=>{
