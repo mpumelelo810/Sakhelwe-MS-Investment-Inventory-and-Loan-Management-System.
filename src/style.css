@@ -10,3 +10,7 @@
 .demo-banner{background:#fff0d5;color:#662123}.login-brand{background:#4f191b}.login-brand .login-description{color:#f3d6bc}.button{background:#a32027}.button.secondary{background:white;color:#8d2427}.eyebrow{color:#9b292d}
 
 .sync-status{margin:20px 34px 0;padding:18px;border:1px solid #eaded4;border-radius:12px;background:#fff4df;display:flex;flex-wrap:wrap;align-items:center;gap:12px}.sync-status>div:first-child{flex:1;min-width:220px}.sync-status p{font-size:.875rem;color:#786560;margin-top:6px}.sync-status .table-wrap{width:100%}
+
+.login-panel > .button {text-decoration:none;margin-top:10px;}
+.top-actions {flex-wrap:wrap;}
+.text-button {display:inline-flex;align-items:center;gap:6px;}
