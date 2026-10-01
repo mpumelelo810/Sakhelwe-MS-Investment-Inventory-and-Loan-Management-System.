@@ -104,3 +104,10 @@ Loan rates are never seeded for the live workspace. The owner must approve the c
 ## Original project goal
 
 Sakhelwe MS Investment needs a reliable way to manage chicken stock, pig stock and customer loans. Without connected delivery notes, receipts and customer histories, it is difficult to verify stock, control lending, track cash and calculate monthly profit. The business needs one simple system that supports daily operations.
+
+
+## Dedicated database provisioned
+
+Sakhelwe Business Control (`hkwmhajogglgqvmxxrxs`) is provisioned on the free plan in eu-west-1. The initial schema is installed; all ten public Sakhelwe tables have RLS enabled and the security advisor returned no findings. The app includes the public project URL and publishable key as defaults; environment variables can override them. These are client configuration, never a service-role key.
+
+The owner Auth account and staff membership still need setup. Netlify deployment and authenticated save/reload verification remain pending. Do not enter business records in the sample workspace.

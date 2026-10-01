@@ -4,7 +4,7 @@ import {createClient} from '@supabase/supabase-js';
 import {LayoutDashboard,Package,ShoppingCart,Users,Wallet,BarChart3,Settings,Plus,Download,LogOut,Search,X,RefreshCw,AlertCircle,Check,Menu,Receipt,HandCoins,ShieldCheck,ChevronRight} from 'lucide-react';
 import {today,money,round,interest,empty,demo,demoPost,totals,account,csv} from './model';
 import './style.css';
-const url=import.meta.env.VITE_SUPABASE_URL,key=import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const url=import.meta.env.VITE_SUPABASE_URL||'https://hkwmhajogglgqvmxxrxs.supabase.co',key=import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY||'sb_publishable_89Aozf8F5YLxP8SQXIXf5Q_q0PngA7-';
 const configured=Boolean(url&&key);const db=configured?createClient(url,key):null;
 const pages=[['Overview',LayoutDashboard],['Stock',Package],['Sales',ShoppingCart],['Customers',Users],['Loans',HandCoins],['Expenses',Wallet],['Reports',BarChart3],['Settings',Settings]];
 const kinds={capital:'Record capital',receive:'Receive stock',sale:'Record sale',loss:'Record stock loss',customer:'Register customer',product:'Add product',expense:'Record expense',loan:'Issue loan',repay:'Record repayment',accrue:'Post earned interest',invoice_payment:'Record invoice payment',reserve:'Transfer to reserve',policy:'Approve loan policy'};

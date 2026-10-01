@@ -4,7 +4,7 @@ const assets=await readdir(new URL('../dist/assets',import.meta.url)),bundle=awa
 const tick=()=>new Promise(resolve=>setTimeout(resolve,60));
 test('built interface opens sample workspace, navigates all pages and records a delivery',async()=>{
  const dom=new JSDOM('<!doctype html><div id="root"></div>',{url:'https://sakhelwe.example',runScripts:'outside-only',pretendToBeVisual:true});const w=dom.window,doc=w.document,errors=[];w.addEventListener('error',e=>errors.push(e.error?.message||e.message));
- w.structuredClone=structuredClone;try{w.eval(bundle);await tick();assert.match(doc.body.textContent,/Welcome back/);assert.match(doc.body.textContent,/awaiting its dedicated database/);
+ w.structuredClone=structuredClone;try{w.eval(bundle);await tick();assert.match(doc.body.textContent,/Welcome back/);assert.match(doc.body.textContent,/Sign in to your business workspace/);
  const button=text=>[...doc.querySelectorAll('button')].find(x=>x.textContent.trim()===text);
  button('Open sample workspace').click();await tick();assert.match(doc.body.textContent,/Business overview/);assert.match(doc.body.textContent,/E 7,510.00/);assert.match(doc.body.textContent,/E 1,230.00/);
  for(const name of ['Stock','Sales','Customers','Loans','Expenses','Reports','Settings','Overview']){[...doc.querySelectorAll('nav button')].find(b=>b.textContent.startsWith(name)).click();await tick();assert.equal(doc.querySelector('.page-heading h1').textContent,name==='Overview'?'Business overview':name);}
