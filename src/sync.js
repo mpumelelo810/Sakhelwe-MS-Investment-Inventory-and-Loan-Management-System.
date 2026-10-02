@@ -7,12 +7,20 @@ export const syncRetry=user=>change(user,d=>{if(d.queue[0])d.queue[0].error=null
 export const syncBackup=user=>change(user,d=>JSON.stringify({format:'sakhelwe-cloud-outbox-v1',user_id:user,...d},null,2));
 const running=new Map();
 export function syncRun(user,rpc){if(running.has(user))return running.get(user);const promise=run(user,rpc).finally(()=>running.delete(user));running.set(user,promise);return promise;}
+function normalisePayload(payload){
+ const next=structuredClone(payload||{});
+ // Optional foreign keys must never be sent as an empty UUID string.
+ for(const field of ['product_id','customer_id','invoice_id','loan_id','policy_id']){
+  if(field in next && (next[field]===null || String(next[field]).trim()==='')) next[field]=null;
+ }
+ return next;
+}
 async function run(user,rpc){
  // Membership is checked before posting. A network failure leaves every entry intact.
  let snapshot=await rpc('sakhelwe_snapshot');
  await change(user,d=>{d.snapshot=snapshot;d.updatedAt=new Date().toISOString()});
  while(true){const doc=await syncRead(user),entry=doc.queue[0];if(!entry)break;if(entry.error)throw Error(entry.error);
-  try{await rpc('sakhelwe_post',{kind:entry.kind,payload:entry.payload,request_key:entry.key});}
+  try{await rpc('sakhelwe_post',{kind:entry.kind,payload:normalisePayload(entry.payload),request_key:entry.key});}
   catch(e){if(e.code&& !['PGRST000','PGRST001','PGRST002','PGRST003','57014','53300','57P01'].includes(e.code)&&!String(e.code).startsWith('08'))await change(user,d=>{const first=d.queue.find(x=>x.key===entry.key);if(first)first.error=e.message});throw e}
   // Only acknowledge after the server confirms. Duplicate retries use the same UUID.
   await change(user,d=>{d.queue=d.queue.filter(x=>x.key!==entry.key)});
