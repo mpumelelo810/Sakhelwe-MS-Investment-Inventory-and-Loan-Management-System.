@@ -14,3 +14,13 @@
 .login-panel > .button {text-decoration:none;margin-top:10px;}
 .top-actions {flex-wrap:wrap;}
 .text-button {display:inline-flex;align-items:center;gap:6px;}
+
+
+/* Simple owner-first navigation */
+.simple-nav{display:flex;flex-direction:column;gap:6px}
+.simple-nav>button{min-height:48px}
+.simple-nav .more-toggle{margin-top:8px}
+.simple-nav .advanced-nav{display:flex;flex-direction:column;gap:4px;padding:4px 0 2px 14px}
+.simple-nav .advanced-nav button{min-height:42px}
+.simple-nav .advanced-nav .active{background:rgba(31,108,69,.12)}
+.simple-nav .rotate{transform:rotate(90deg)}
