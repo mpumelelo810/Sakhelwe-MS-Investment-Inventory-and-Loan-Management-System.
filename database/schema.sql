@@ -62,9 +62,14 @@ begin
   if amt is null or amt<=0 or (p->>'amount')::numeric<>amt then raise exception 'Enter a positive amount with at most two decimal places.'; end if;
  end if;
  if k in ('opening_stock','receive','sale','mortality','loss') then
-  product:=(p->>'product_id')::uuid;
+  product:=nullif(trim(coalesce(p->>'product_id','')),'')::uuid;
+  if product is null then
+    select id into product from public.sakhelwe_products
+    where division=case when p->>'division' in ('Poultry','Pigs') then p->>'division' else null end
+    order by name limit 1;
+  end if;
   select * into prod from public.sakhelwe_products where id=product;
-  if not found then raise exception 'Choose an existing product.'; end if;
+  if not found then raise exception 'Choose an existing livestock product.'; end if;
   qty:=(p->>'quantity')::numeric;
   if k in ('opening_stock','receive') then age_weeks:=coalesce((p->>'age_weeks')::integer,0); if age_weeks<0 or age_weeks>200 then raise exception 'Age must be between 0 and 200 weeks.'; end if; end if;
   if qty is null or qty<=0 or (p->>'quantity')::numeric<>qty or (prod.unit='each' and qty<>trunc(qty)) then raise exception 'Enter a valid quantity in the product stock unit.'; end if;
