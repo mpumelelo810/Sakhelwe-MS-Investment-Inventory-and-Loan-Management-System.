@@ -1,6 +1,7 @@
 export const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Mbabane',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 export const money=n=>`E ${Number(n||0).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 export const round=n=>Math.round((n+Number.EPSILON)*100)/100;
+export const ageWeeks=(b,date=today())=>Math.max(0,Number(b.age_weeks||0)+Math.floor(days(b.received_on,date)/7));
 export const days=(a,b)=>Math.max(0,Math.round((new Date(b+'T12:00:00Z')-new Date(a+'T12:00:00Z'))/86400000));
 export const interest=(l,date=today())=>round(Number(l.principal)*Number(l.annual_rate)*days(l.accrued_through,date)/365);
 export const empty=()=>({role:'owner',products:[],customers:[],batches:[],events:[],invoices:[],policies:[],loans:[],journal:[]});
@@ -34,11 +35,11 @@ export function demoPost(s,k,p,key){
  else if(k==='customer')s.customers.push({id:crypto.randomUUID(),name:p.name,phone:p.phone});
  else if(k==='policy'){if(p.approved!=='yes'||Number(p.annual_rate)<0||Number(p.annual_rate)>100)throw Error('Confirm the approved rate, between 0 and 100%.');s.policies.push({id:crypto.randomUUID(),name:p.name,annual_rate:Number(p.annual_rate)/100});}
  else if(k==='capital'){journal('cash',amount);journal('capital',0,amount);}
- else if(k==='receive'){s.batches.push({id:crypto.randomUUID(),event_id:e.id,product_id:prod.id,received_on:dt,supplier:p.supplier,quantity:q,total_cost:amount,remaining:q,remaining_cost:amount});journal('inventory',amount);journal('cash',0,amount);}
+ else if(k==='receive'){s.batches.push({id:crypto.randomUUID(),event_id:e.id,product_id:prod.id,received_on:dt,supplier:p.supplier,quantity:q,total_cost:amount,remaining:q,remaining_cost:amount,age_weeks:Number(p.age_weeks||0),mortality:0});journal('inventory',amount);journal('cash',0,amount);}
  else if(k==='sale'||k==='loss'){
   let need=q,cost=0;const batches=s.batches.filter(b=>b.product_id===prod.id&&b.remaining>0).sort((a,b)=>a.received_on.localeCompare(b.received_on)||a.id.localeCompare(b.id));
   if(batches.reduce((n,b)=>n+Number(b.remaining),0)<q)throw Error('There is not enough stock.');
-  for(const b of batches){const take=Math.min(need,b.remaining),c=take===b.remaining?b.remaining_cost:round(b.remaining_cost*take/b.remaining);b.remaining-=take;b.remaining_cost=round(b.remaining_cost-c);cost+=c;need-=take;if(need===0)break;}
+  for(const b of batches){const take=Math.min(need,b.remaining),c=take===b.remaining?b.remaining_cost:round(b.remaining_cost*take/b.remaining);b.remaining-=take;b.remaining_cost=round(b.remaining_cost-c);if(k==='loss')b.mortality=Number(b.mortality||0)+take;cost+=c;need-=take;if(need===0)break;}
   journal('inventory',0,cost);
   if(k==='sale'){amount=round(Number(p.pricing_quantity)*Number(p.price));const paid=Number(p.paid);if(!(amount>0)||paid<0||paid>amount||(!p.customer_id&&paid<amount))throw Error('Check payment or select a customer for credit sales.');s.invoices.push({id:e.id,customer_id:p.customer_id||null,total:amount,paid});e.amount=amount;e.description=prod.name+' sale';journal('revenue',0,amount);journal('cash',paid);journal('receivables',amount-paid);journal('cost_of_sales',cost);}
   else{if(!p.description?.trim())throw Error('Give a reason for the stock loss.');journal('expenses',cost);}
