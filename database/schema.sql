@@ -32,7 +32,7 @@ do $$ declare t text; begin foreach t in array array['staff','products','custome
  execute format('grant select on table public.sakhelwe_%I to authenticated',t);
  execute format('create policy staff_read on public.sakhelwe_%I for select to authenticated using ((select sakhelwe_private.role()) is not null)',t);
 end loop; end $$;
--- No direct client INSERT/UPDATE/DELETE. Posted history is append-only to users.
+-- Direct table writes remain blocked. Owner-only transaction deletion is handled through the protected delete function below.
 create function sakhelwe_private.journal(e uuid,a text,d numeric,c numeric) returns void language sql set search_path='' as $$ insert into public.sakhelwe_journal(event_id,account,debit,credit) values(e,a,d,c) $$;
 revoke all on function sakhelwe_private.journal(uuid,text,numeric,numeric) from public;
 
