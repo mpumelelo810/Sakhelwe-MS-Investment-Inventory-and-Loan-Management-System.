@@ -2,6 +2,7 @@ export const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Mbabane
 export const money=n=>`E ${Number(n||0).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 export const round=n=>Math.round((n+Number.EPSILON)*100)/100;
 export const ageWeeks=(b,date=today())=>Math.max(0,Number(b.age_weeks||0)+Math.floor(days(b.received_on,date)/7));
+export const ageCategory=(division,weeks)=>{const w=Number(weeks||0);return division==='Poultry'?(w<=6?'Chicks (0–6 weeks)':w<=18?'Growers (7–18 weeks)':'Adults (19+ weeks)'):(w<=8?'Piglets (0–8 weeks)':w<=20?'Growers (9–20 weeks)':'Adults (21+ weeks)');};
 export const days=(a,b)=>Math.max(0,Math.round((new Date(b+'T12:00:00Z')-new Date(a+'T12:00:00Z'))/86400000));
 export const interest=(l,date=today())=>round(Number(l.principal)*Number(l.annual_rate)*days(l.accrued_through,date)/365);
 export const empty=()=>({role:'owner',products:[],customers:[],batches:[],events:[],invoices:[],policies:[],loans:[],journal:[]});
