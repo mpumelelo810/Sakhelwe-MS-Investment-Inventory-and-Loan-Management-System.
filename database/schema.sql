@@ -7,7 +7,7 @@ create table public.sakhelwe_staff (user_id uuid primary key references auth.use
 create table public.sakhelwe_products (id uuid primary key default gen_random_uuid(), name text not null unique, unit text not null check(unit in ('each','kg')), division text not null check(division in ('Poultry','Pigs')), threshold numeric(16,3) not null default 5 check(threshold>=0));
 create table public.sakhelwe_customers (id uuid primary key default gen_random_uuid(), name text not null, phone text not null default '', created_at timestamptz not null default now());
 create table public.sakhelwe_events (id uuid primary key default gen_random_uuid(), request_key uuid not null unique, actor uuid not null references auth.users(id), kind text not null, business_date date not null, division text not null, description text not null, amount numeric(16,2) not null default 0, payload jsonb not null, created_at timestamptz not null default now());
-create table public.sakhelwe_batches (id uuid primary key default gen_random_uuid(), product_id uuid not null references public.sakhelwe_products, event_id uuid not null references public.sakhelwe_events, received_on date not null, supplier text not null, quantity numeric(16,3) not null check(quantity>0), total_cost numeric(16,2) not null check(total_cost>=0), remaining numeric(16,3) not null check(remaining>=0), remaining_cost numeric(16,2) not null check(remaining_cost>=0), age_weeks integer not null default 0 check(age_weeks>=0 and age_weeks<=200), mortality numeric(16,3) not null default 0 check(mortality>=0 and mortality<=quantity));
+create table public.sakhelwe_batches (id uuid primary key default gen_random_uuid(), product_id uuid not null references public.sakhelwe_products, event_id uuid not null references public.sakhelwe_events, received_on date not null, supplier text not null default '', quantity numeric(16,3) not null check(quantity>0), total_cost numeric(16,2) not null check(total_cost>=0), remaining numeric(16,3) not null check(remaining>=0), remaining_cost numeric(16,2) not null check(remaining_cost>=0), age_weeks integer not null default 0 check(age_weeks>=0 and age_weeks<=200), mortality numeric(16,3) not null default 0 check(mortality>=0 and mortality<=quantity));
 create table public.sakhelwe_stock_movements (id bigint generated always as identity primary key, event_id uuid not null references public.sakhelwe_events, batch_id uuid not null references public.sakhelwe_batches, quantity numeric(16,3) not null, value numeric(16,2) not null);
 create table public.sakhelwe_invoices (id uuid primary key references public.sakhelwe_events, customer_id uuid references public.sakhelwe_customers, total numeric(16,2) not null check(total>0), paid numeric(16,2) not null check(paid>=0 and paid<=total));
 create table public.sakhelwe_policies (id uuid primary key default gen_random_uuid(), name text not null, annual_rate numeric(9,6) not null check(annual_rate>=0 and annual_rate<=1), approved_by uuid not null references auth.users(id), approved_at timestamptz not null default now());
@@ -61,12 +61,12 @@ begin
   amt:=(p->>'amount')::numeric;
   if amt is null or amt<=0 or (p->>'amount')::numeric<>amt then raise exception 'Enter a positive amount with at most two decimal places.'; end if;
  end if;
- if k in ('receive','sale','loss') then
+ if k in ('opening_stock','receive','sale','mortality','loss') then
   product:=(p->>'product_id')::uuid;
   select * into prod from public.sakhelwe_products where id=product;
   if not found then raise exception 'Choose an existing product.'; end if;
   qty:=(p->>'quantity')::numeric;
-  if k='receive' then age_weeks:=coalesce((p->>'age_weeks')::integer,0); if age_weeks<0 or age_weeks>200 then raise exception 'Age must be between 0 and 200 weeks.'; end if; end if;
+  if k in ('opening_stock','receive') then age_weeks:=coalesce((p->>'age_weeks')::integer,0); if age_weeks<0 or age_weeks>200 then raise exception 'Age must be between 0 and 200 weeks.'; end if; end if;
   if qty is null or qty<=0 or (p->>'quantity')::numeric<>qty or (prod.unit='each' and qty<>trunc(qty)) then raise exception 'Enter a valid quantity in the product stock unit.'; end if;
   division:=prod.division;
  end if;
@@ -86,7 +86,7 @@ begin
   if staff_role<>'owner' or (p->>'approved') is distinct from 'yes' then raise exception 'The owner must explicitly approve the loan terms.'; end if;
   if length(trim(coalesce(p->>'name','')))<2 then raise exception 'Enter a policy name.'; end if;
   insert into public.sakhelwe_policies(name,annual_rate,approved_by) values(trim(p->>'name'),(p->>'annual_rate')::numeric/100,actor_id);
- elsif k not in ('capital','receive','sale','loss','expense','loan','repay','accrue','invoice_payment','reserve') then raise exception 'Unknown transaction type.';
+ elsif k not in ('capital','opening_stock','receive','sale','mortality','loss','expense','loan','repay','accrue','invoice_payment','reserve') then raise exception 'Unknown transaction type.';
  end if;
  if k in ('capital','reserve','loan','policy') and staff_role<>'owner' then raise exception 'Only the owner can perform this action.'; end if;
  if k='sale' then
@@ -101,11 +101,17 @@ begin
  insert into public.sakhelwe_events(request_key,actor,kind,business_date,division,description,amount,payload) values(r,actor_id,k,dt,division,label,amt,p) returning id into e;
  if k='capital' then
   perform sakhelwe_private.journal(e,'cash',amt,0); perform sakhelwe_private.journal(e,'capital',0,amt);
- elsif k='receive' then
-  insert into public.sakhelwe_batches(product_id,event_id,received_on,supplier,quantity,total_cost,remaining,remaining_cost) values(product,e,dt,coalesce(p->>'supplier',''),qty,amt,qty,amt,age_weeks,0) returning id into b;
+ elsif k in ('opening_stock','receive') then
+  if k='opening_stock' then
+    amt:=0;
+  end if;
+  insert into public.sakhelwe_batches(product_id,event_id,received_on,supplier,quantity,total_cost,remaining,remaining_cost,age_weeks,mortality)
+    values(product,e,dt,case when k='opening_stock' then 'Opening stock' else coalesce(p->>'supplier','') end,qty,amt,qty,amt,age_weeks,0) returning id into b;
   insert into public.sakhelwe_stock_movements(event_id,batch_id,quantity,value) values(e,b,qty,amt);
-  perform sakhelwe_private.journal(e,'inventory',amt,0); perform sakhelwe_private.journal(e,'cash',0,amt);
- elsif k in ('sale','loss') then
+  if amt>0 then
+    perform sakhelwe_private.journal(e,'inventory',amt,0); perform sakhelwe_private.journal(e,'cash',0,amt);
+  end if;
+ elsif k in ('sale','mortality','loss') then
   needed:=qty;
   for batch in select * from public.sakhelwe_batches where product_id=product and remaining>0 order by received_on,id for update loop
    take:=least(needed,batch.remaining);
@@ -120,8 +126,12 @@ begin
    perform sakhelwe_private.journal(e,'cash',paid,0); perform sakhelwe_private.journal(e,'receivables',amt-paid,0); perform sakhelwe_private.journal(e,'revenue',0,amt);
    perform sakhelwe_private.journal(e,'cost_of_sales',cost,0);
   else
-   if length(trim(coalesce(p->>'description','')))<3 then raise exception 'Give a reason for the stock loss.'; end if;
-   perform sakhelwe_private.journal(e,'expenses',cost,0);
+   if length(trim(coalesce(p->>'description','')))<3 then raise exception 'Give a reason for the mortality/loss.'; end if;
+   if k='mortality' then
+     perform sakhelwe_private.journal(e,'expenses',cost,0);
+   else
+     perform sakhelwe_private.journal(e,'expenses',cost,0);
+   end if;
   end if;
   perform sakhelwe_private.journal(e,'inventory',0,cost);
  elsif k='expense' then
