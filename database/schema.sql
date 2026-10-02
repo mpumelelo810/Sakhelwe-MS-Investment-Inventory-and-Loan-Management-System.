@@ -121,7 +121,7 @@ begin
   for batch in select * from public.sakhelwe_batches where product_id=product and remaining>0 order by received_on,id for update loop
    take:=least(needed,batch.remaining);
    part:=case when take=batch.remaining then batch.remaining_cost else round(batch.remaining_cost*take/batch.remaining,2) end;
-   update public.sakhelwe_batches set remaining=remaining-take,remaining_cost=remaining_cost-part,mortality=case when k='loss' then mortality+take else mortality end where id=batch.id;
+   update public.sakhelwe_batches set remaining=remaining-take,remaining_cost=remaining_cost-part,mortality=case when k='mortality' then mortality+take else mortality end where id=batch.id;
    insert into public.sakhelwe_stock_movements(event_id,batch_id,quantity,value) values(e,batch.id,-take,-part);
    cost:=cost+part; needed:=needed-take; exit when needed=0;
   end loop;
@@ -200,4 +200,65 @@ grant execute on function sakhelwe_private.snapshot() to authenticated;
 create function public.sakhelwe_snapshot() returns jsonb language sql security invoker set search_path='' as $$ select sakhelwe_private.snapshot() $$;
 revoke all on function public.sakhelwe_snapshot() from public,anon;
 grant execute on function public.sakhelwe_snapshot() to authenticated;
+
+create function sakhelwe_private.delete_event(event_id uuid) returns uuid language plpgsql security definer set search_path='' as $
+declare
+ actor_id uuid:=auth.uid(); staff_role text; ev public.sakhelwe_events%rowtype; inv public.sakhelwe_invoices%rowtype; ln public.sakhelwe_loans%rowtype;
+ mv record; b public.sakhelwe_batches%rowtype; original_paid numeric; payment_amount numeric;
+begin
+ if actor_id is null then raise exception 'Please sign in.'; end if;
+ select role into staff_role from public.sakhelwe_staff where user_id=actor_id;
+ if staff_role is distinct from 'owner' then raise exception 'Only the owner can delete a saved record.'; end if;
+ perform pg_advisory_xact_lock(7420911);
+ select * into ev from public.sakhelwe_events where id=event_id for update;
+ if not found then raise exception 'Record not found.'; end if;
+ if ev.kind in ('repay','accrue') then raise exception 'Loan repayment/interest records cannot be deleted because they change a loan history.'; end if;
+ if ev.kind in ('opening_stock','receive') then
+  select * into b from public.sakhelwe_batches where event_id=ev.id for update;
+  if not found then raise exception 'The stock batch for this record was not found.'; end if;
+  if exists(select 1 from public.sakhelwe_stock_movements where batch_id=b.id and event_id<>ev.id) then raise exception 'This stock entry has already been used. Delete the later stock records first.'; end if;
+  delete from public.sakhelwe_stock_movements where event_id=ev.id;
+  delete from public.sakhelwe_batches where id=b.id;
+ elsif ev.kind in ('sale','mortality','loss') then
+  if ev.kind='sale' then
+   select * into inv from public.sakhelwe_invoices where id=ev.id for update;
+   if found then
+    original_paid:=coalesce((ev.payload->>'paid')::numeric,0);
+    if inv.paid>original_paid then raise exception 'This sale has later payment records. Delete those payment records first.'; end if;
+    delete from public.sakhelwe_invoices where id=ev.id;
+   end if;
+  end if;
+  for mv in select batch_id,quantity,value from public.sakhelwe_stock_movements where event_id=ev.id loop
+   update public.sakhelwe_batches
+   set remaining=remaining-mv.quantity,
+       remaining_cost=remaining_cost-mv.value,
+       mortality=case when ev.kind='mortality' then greatest(0,mortality-mv.quantity) else mortality end
+   where id=mv.batch_id;
+  end loop;
+  delete from public.sakhelwe_stock_movements where event_id=ev.id;
+ elsif ev.kind='invoice_payment' then
+  payment_amount:=coalesce((ev.payload->>'amount')::numeric,0);
+  select * into inv from public.sakhelwe_invoices where id=nullif(trim(coalesce(ev.payload->>'invoice_id','')), '')::uuid for update;
+  if not found then raise exception 'The invoice for this payment no longer exists.'; end if;
+  if payment_amount>inv.paid then raise exception 'Payment record is inconsistent with the invoice.'; end if;
+  update public.sakhelwe_invoices set paid=paid-payment_amount where id=inv.id;
+ elsif ev.kind='loan' then
+  select * into ln from public.sakhelwe_loans where id=ev.id for update;
+  if not found then raise exception 'Loan account not found.'; end if;
+  if exists(select 1 from public.sakhelwe_events x where x.id<>ev.id and x.payload->>'loan_id'=ev.id::text) then raise exception 'This loan has later repayment or interest records. Delete those records first.'; end if;
+  delete from public.sakhelwe_loans where id=ev.id;
+ elsif ev.kind in ('capital','expense','reserve') then
+  null;
+ else
+  raise exception 'This record type cannot be deleted yet.';
+ end if;
+ delete from public.sakhelwe_journal where event_id=ev.id;
+ delete from public.sakhelwe_events where id=ev.id;
+ return ev.id;
+end $;
+revoke all on function sakhelwe_private.delete_event(uuid) from public;
+grant execute on function sakhelwe_private.delete_event(uuid) to authenticated;
+create function public.sakhelwe_delete_event(event_id uuid, expected_user_id uuid) returns uuid language sql security invoker set search_path='' as $ select sakhelwe_private.delete_event(event_id) where (select auth.uid())=expected_user_id $;
+revoke all on function public.sakhelwe_delete_event(uuid,uuid) from public,anon;
+grant execute on function public.sakhelwe_delete_event(uuid,uuid) to authenticated;
 commit;
