@@ -55,7 +55,7 @@ begin
   return prior.id;
  end if;
  if dt is null or dt>(now() at time zone 'Africa/Mbabane')::date then raise exception 'Choose today or an earlier business date.'; end if;
- if dt<coalesce((select max(business_date) from public.sakhelwe_events),dt) then raise exception 'This date is earlier than the latest saved entry. Record in date order.'; end if;
+ if k<>'opening_stock' and dt<coalesce((select max(business_date) from public.sakhelwe_events),dt) then raise exception 'This date is earlier than the latest saved entry. Record in date order.'; end if;
  if length(coalesce(p->>'description',''))>500 then raise exception 'Description must be 500 characters or fewer.'; end if;
  if k in ('capital','receive','expense','loan','repay','invoice_payment','reserve') then
   amt:=(p->>'amount')::numeric;
