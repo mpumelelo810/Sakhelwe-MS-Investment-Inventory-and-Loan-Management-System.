@@ -6,6 +6,12 @@ export const syncEnqueue=(user,kind,payload,key)=>change(user,d=>{if(!d.snapshot
 export const syncRetry=user=>change(user,d=>{if(d.queue[0])d.queue[0].error=null;});
 // Explicitly discard all locally queued, unconfirmed entries for this user.
 export const syncClearPending=user=>change(user,d=>{d.queue=[];});
+// Repair a single queued entry without deleting it. Used for legacy entries created before
+// livestock product selection was required.
+export const syncRepairPending=(user,key,patch)=>change(user,d=>{
+ const entry=d.queue.find(e=>e.key===key); if(!entry)throw Error('Pending entry no longer exists.');
+ entry.payload={...entry.payload,...structuredClone(patch)}; entry.error=null;
+});
 export const syncBackup=user=>change(user,d=>JSON.stringify({format:'sakhelwe-cloud-outbox-v1',user_id:user,...d},null,2));
 const running=new Map();
 export function syncRun(user,rpc){if(running.has(user))return running.get(user);const promise=run(user,rpc).finally(()=>running.delete(user));running.set(user,promise);return promise;}
