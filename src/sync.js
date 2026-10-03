@@ -4,6 +4,8 @@ async function change(user,fn){if(!user)throw Error('Sign in before using cloud 
 export const syncRead=user=>change(user,d=>structuredClone(d));
 export const syncEnqueue=(user,kind,payload,key)=>change(user,d=>{if(!d.snapshot)throw Error('Connect once to load your authorised workspace before recording offline.');if(d.snapshot.role==='analyst')throw Error('This account is read-only.');const prior=d.queue.find(e=>e.key===key);if(prior){if(prior.kind!==kind||JSON.stringify(prior.payload)!==JSON.stringify(payload))throw Error('Request key already used.');return}d.queue.push({key,kind,payload:structuredClone(payload),createdAt:new Date().toISOString(),error:null});});
 export const syncRetry=user=>change(user,d=>{if(d.queue[0])d.queue[0].error=null;});
+// Explicitly discard all locally queued, unconfirmed entries for this user.
+export const syncClearPending=user=>change(user,d=>{d.queue=[];});
 export const syncBackup=user=>change(user,d=>JSON.stringify({format:'sakhelwe-cloud-outbox-v1',user_id:user,...d},null,2));
 const running=new Map();
 export function syncRun(user,rpc){if(running.has(user))return running.get(user);const promise=run(user,rpc).finally(()=>running.delete(user));running.set(user,promise);return promise;}
