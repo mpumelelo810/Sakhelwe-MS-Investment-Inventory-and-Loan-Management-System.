@@ -172,7 +172,12 @@ begin
   update public.sakhelwe_loans set principal=ln.principal,interest=ln.interest,accrued_through=dt,status=case when ln.principal+ln.interest=0 then 'settled' else 'active' end where id=ln.id;
  end if;
  select coalesce(sum(debit-credit),0) into cash from public.sakhelwe_journal where account='cash';
- if cash<0 then raise exception 'There is not enough operating cash. Record a verified capital contribution first.'; end if;
+ -- Opening stock, mortality and stock loss are non-cash records. They represent stock
+ -- already on hand or a physical reduction, so they must not be blocked by a zero
+ -- operating-cash balance. Cash-consuming transactions still require available cash.
+ if k in ('receive','expense','loan','repay','invoice_payment','reserve') and cash<0 then
+   raise exception 'There is not enough operating cash. Record a verified capital contribution first.';
+ end if;
  if (select coalesce(sum(debit-credit),0) from public.sakhelwe_journal where event_id=e)<>0 then raise exception 'Journal does not balance.'; end if;
  return e;
 end $$;
