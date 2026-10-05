@@ -4,7 +4,7 @@ import {createClient} from '@supabase/supabase-js';
 import {LayoutDashboard,Package,ShoppingCart,Users,Wallet,BarChart3,Settings,Plus,Download,LogOut,Search,X,RefreshCw,AlertCircle,Check,Menu,Receipt,HandCoins,ShieldCheck,ChevronRight,ArrowLeft,Drumstick,PiggyBank} from 'lucide-react';
 import {today,money,round,interest,empty,demo,demoPost,totals,account,csv,ageWeeks,ageCategory} from './model';
 import './style.css';
-import {syncRead,syncEnqueue,syncRun,syncRetry,syncBackup,syncClearPending} from './sync';
+import {syncRead,syncEnqueue,syncRun,syncRetry,syncBackup} from './sync';
 import {deviceRead,deviceWrite,deviceBackup,deviceRestore} from './device';
 const standalone=location.protocol==='file:';
 if(!standalone&&'serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
@@ -29,7 +29,7 @@ function App(){
  activeUser.current=mode==='live'?session?.user.id:null;
  async function load(retry=false){const user=session?.user.id;if(!db||!user||syncRef.current)return;syncRef.current=true;setLoading(true);setError('');
   const show=doc=>{if(activeUser.current!==user)return;if(doc.snapshot)setS(doc.snapshot);setOutbox(doc.queue);setLastSync(doc.updatedAt)};
-  try{const local=await syncRead(user);if(local.queue?.length&&!localStorage.getItem('sakhelwe_pending_reset_20261003_'+user)){await syncClearPending(user);localStorage.setItem('sakhelwe_pending_reset_20261003_'+user,'1');}show(await syncRead(user));if(navigator.onLine===false)return;if(retry)await syncRetry(user);
+  try{const local=await syncRead(user);show(local);if(navigator.onLine===false)return;if(retry)await syncRetry(user);
    const rpc=async(fn,args)=>{if(activeUser.current!==user)throw Error('Account changed; sync stopped.');const auth=await db.auth.getSession();if(auth.data.session?.user.id!==user)throw Error('Sign in again to sync your records.');const{data,error}=await db.rpc(fn==='sakhelwe_post'?'sakhelwe_sync_post':'sakhelwe_sync_snapshot',{...args,expected_user_id:user});if(error)throw error;return data};
    show(await syncRun(user,rpc));
   }catch(e){if(activeUser.current===user){try{show(await syncRead(user))}catch{}setError('Sync paused: '+e.message+'. Your pending entries remain on this device.')}}finally{syncRef.current=false;if(activeUser.current===user)setLoading(false)}
