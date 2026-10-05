@@ -6,7 +6,7 @@ test('built interface opens sample workspace, navigates all pages and records a 
  w.structuredClone=structuredClone;try{w.eval(bundle);await tick();assert.match(doc.body.textContent,/Welcome back/);assert.match(doc.body.textContent,/Sign in to your business workspace/);
  const button=text=>[...doc.querySelectorAll('button')].find(x=>x.textContent.trim()===text);
  button('Open sample workspace').click();await tick();assert.match(doc.body.textContent,/Business overview/);assert.match(doc.body.textContent,/E 7,510.00/);assert.match(doc.body.textContent,/E 1,230.00/);
- for(const name of ['Stock','Sales','Customers','Loans','Expenses','Reports','Settings','Overview']){[...doc.querySelectorAll('nav button')].find(b=>b.textContent.startsWith(name)).click();await tick();assert.equal(doc.querySelector('.page-heading h1').textContent,name==='Overview'?'Business overview':name);}
+ for(const name of ['Chickens','Pigs','Sales','Customers','Loans','Expenses','Reports','Settings','Overview']){[...doc.querySelectorAll('nav button')].find(b=>b.textContent.startsWith(name)).click();await tick();assert.equal(doc.querySelector('.page-heading h1').textContent,name==='Overview'?'Business overview':name);}
  button('Receive a deliveryAdd stock and purchase cost').click();await tick();const form=doc.querySelector('.modal form');assert.ok(form);
  const select=form.querySelector('[name=product_id]');select.value='chicken';select.dispatchEvent(new w.Event('change',{bubbles:true}));await tick();
  const input=form.querySelector('[name=quantity]');Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype,'value').set.call(input,'5');input.dispatchEvent(new w.Event('input',{bubbles:true}));await tick();
