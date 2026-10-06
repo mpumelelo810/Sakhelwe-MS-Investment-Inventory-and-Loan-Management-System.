@@ -52,9 +52,11 @@ export function demoPost(s,k,p,key){
    journal('cash',Number(p.amount)); journal('capital',0,Number(p.amount));
  } else if(k==='opening_stock'||k==='receive'){
    const age=Number(p.age_weeks||0);
+   const sex=String(p.sex||'Unknown');
    if(age<0||age>200||!Number.isInteger(age))throw Error('Age must be between 0 and 200 weeks.');
+   if(!['Male','Female','Mixed','Unknown'].includes(sex))throw Error('Choose Male, Female, Mixed or Unknown.');
    const cost=k==='receive'?Number(p.amount):0;
-   s.batches.push({id:crypto.randomUUID(),event_id:e.id,product_id:prod.id,received_on:dt,supplier:k==='receive'?(p.supplier||''): 'Opening stock',quantity:q,total_cost:cost,remaining:q,remaining_cost:cost,age_weeks:age,mortality:0});
+   s.batches.push({id:crypto.randomUUID(),event_id:e.id,product_id:prod.id,received_on:dt,supplier:k==='receive'?(p.supplier||''): 'Opening stock',quantity:q,total_cost:cost,remaining:q,remaining_cost:cost,age_weeks:age,sex,mortality:0});
    if(cost>0){journal('inventory',cost);journal('cash',0,cost)}else journal('inventory',0,0);
    e.amount=cost;
    e.description=k==='opening_stock'?prod.name+' opening stock':prod.name+' stock received';
@@ -108,7 +110,7 @@ export function demoPost(s,k,p,key){
    l.accrued_through=dt;l.status=l.principal+l.interest===0?'settled':'active';e.division='Loans';
  } else throw Error('Unknown transaction.');
 
- if(account(s,'cash')<0)throw Error('There is not enough operating cash. Record capital first.');
+ // Negative operating cash is allowed. The owner can record expenses, purchases and loans before cash is replenished.
  s.events.unshift(e);return e.id;
 }
 export function csv(rows){return rows.map(row=>row.map(x=>{let value=String(x??'');if(/^[=+@\-\t\r]/.test(value))value="'"+value;return '"'+value.replaceAll('"','""')+'"';}).join(',')).join('\r\n');}
