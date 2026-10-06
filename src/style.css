@@ -24,3 +24,12 @@
 .simple-nav .advanced-nav button{min-height:42px}
 .simple-nav .advanced-nav .active{background:rgba(31,108,69,.12)}
 .simple-nav .rotate{transform:rotate(90deg)}
+
+
+/* Template-style simple registers */
+.register-toolbar{display:flex;justify-content:space-between;align-items:center;gap:14px;margin:0 0 18px;flex-wrap:wrap}
+.register-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.register-tabs button{border:1px solid var(--border);background:#fff;border-radius:7px;padding:10px 13px;color:#756765;font-size:.82rem;font-weight:600;cursor:pointer}
+.register-tabs button:hover{background:#faf7f6}
+.register-tabs button.active{background:#4f191b;color:#fff;border-color:#4f191b}
+.register-toolbar .search{margin:0;max-width:300px}
