@@ -44,3 +44,8 @@ All 18 automated tests pass, covering ledger integrity, permissions, verified-ow
 ## Limits
 
 This app records money; it does not transfer funds. Remaining controls include authorized ledger corrections, opening legacy balances, period closing, evidence uploads, cash-account separation, expense allocation, backup/restore rehearsal and deployed authenticated acceptance. VAT and statutory financial reports are not calculated. Loan policy must be explicitly approved before lending is enabled.
+
+
+## Chicken batch cycle accounting
+
+Chicken records are now organized by month and automatic batch letters, for example **September 2026 — Batch A**, then Batch B for another September intake. Each batch keeps its own day-old chick cost, batch expenses, mortality, growing/ready status, live and dressed stock, sales, paid/owing amounts and profit. At six weeks the batch is shown as **Ready Batch**. When all birds are accounted for, the owner can close the cycle and the site keeps a final batch report showing total costs, revenue, money received, outstanding amounts and profit/loss. Monthly chicken totals are also shown separately.
