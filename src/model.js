@@ -106,11 +106,10 @@ export function demoPost(s,k,p,key){
    if(!inv||Number(p.amount)>inv.total-inv.paid)throw Error('Payment exceeds the invoice balance.');
    inv.paid=round(inv.paid+Number(p.amount));journal('cash',Number(p.amount));journal('receivables',0,Number(p.amount));
  } else if(k==='loan'){
-   const policy=s.policies.find(x=>x.id===p.policy_id);
-   if(!policy||!s.customers.some(x=>x.id===p.customer_id))throw Error('Select a customer and an approved loan policy.');
+   if(!s.customers.some(x=>x.id===p.customer_id))throw Error('Select a registered customer.');
    if(s.loans.some(l=>l.customer_id===p.customer_id&&l.status==='active')||s.invoices.some(i=>i.customer_id===p.customer_id&&i.paid<i.total))throw Error('This customer must clear existing debt first.');
    if(p.due_on<dt)throw Error('Check the due date.');
-   s.loans.push({id:e.id,customer_id:p.customer_id,policy_id:policy.id,principal:Number(p.amount),original_amount:Number(p.amount),interest:0,annual_rate:policy.annual_rate,accrued_through:dt,due_on:p.due_on,status:'active'});
+   s.loans.push({id:e.id,customer_id:p.customer_id,principal:Number(p.amount),original_amount:Number(p.amount),interest:0,annual_rate:0.30,accrued_through:dt,due_on:p.due_on,status:'active'});
    e.division='Loans';journal('principal',Number(p.amount));journal('cash',0,Number(p.amount));
  } else if(k==='repay'||k==='accrue'){
    const l=s.loans.find(x=>x.id===p.loan_id&&x.status==='active');
