@@ -186,7 +186,6 @@ begin
  'events',coalesce((select jsonb_agg(x order by x.business_date desc,x.created_at desc) from public.sakhelwe_events x),'[]'::jsonb),
  'batches',coalesce((select jsonb_agg(x) from public.sakhelwe_batches x),'[]'::jsonb),
  'invoices',coalesce((select jsonb_agg(x) from public.sakhelwe_invoices x),'[]'::jsonb),
- 'policies',coalesce((select jsonb_agg(x) from public.sakhelwe_removed x),'[]'::jsonb),
  'loans',coalesce((select jsonb_agg(x) from public.sakhelwe_loans x),'[]'::jsonb),
  'journal',coalesce((select jsonb_agg(x) from public.sakhelwe_journal x),'[]'::jsonb));
 end $$;
