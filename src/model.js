@@ -4,10 +4,19 @@ export const round=n=>Math.round((n+Number.EPSILON)*100)/100;
 export const ageWeeks=(b,date=today())=>Math.max(0,Number(b.age_weeks||0)+Math.floor(days(b.received_on,date)/7));
 export const ageCategory=(division,weeks)=>{const w=Number(weeks||0);return division==='Poultry'?(w<=6?'Chicks (0–6 weeks)':w<=18?'Growers (7–18 weeks)':'Adults (19+ weeks)'):(w<=8?'Piglets (0–8 weeks)':w<=20?'Growers (9–20 weeks)':'Adults (21+ weeks)');};
 export const days=(a,b)=>Math.max(0,Math.round((new Date(b+'T12:00:00Z')-new Date(a+'T12:00:00Z'))/86400000));
+export const addDays=(date,n)=>{
+ const d=new Date(date+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+Number(n||0));return d.toISOString().slice(0,10);
+};
+export const addMonths=(date,n=1)=>{
+ const d=new Date(date+'T12:00:00Z'),day=d.getUTCDate();
+ d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()+Number(n||0));
+ const last=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,0)).getUTCDate();
+ d.setUTCDate(Math.min(day,last));return d.toISOString().slice(0,10);
+};
 export const compoundPeriods=(dueOn,date=today())=>{
  if(!dueOn||date<dueOn)return 0;
  let n=0,d=dueOn;
- while(d<=date){n++;const next=new Date(d+'T12:00:00Z');next.setUTCMonth(next.getUTCMonth()+1);d=next.toISOString().slice(0,10);}
+ while(d<=date){n++;d=addMonths(d,1);}
  return n;
 };
 export const compoundBalance=(principal,periods)=>round(Number(principal)*Math.pow(1.30,Math.max(0,Number(periods||0))));
@@ -109,7 +118,7 @@ export function demoPost(s,k,p,key){
    if(!s.customers.some(x=>x.id===p.customer_id))throw Error('Select a registered customer.');
    if(s.loans.some(l=>l.customer_id===p.customer_id&&l.status==='active')||s.invoices.some(i=>i.customer_id===p.customer_id&&i.paid<i.total))throw Error('This customer must clear existing debt first.');
    if(p.due_on<dt)throw Error('Check the due date.');
-   s.loans.push({id:e.id,customer_id:p.customer_id,principal:Number(p.amount),original_amount:Number(p.amount),interest:0,annual_rate:0.30,accrued_through:days(p.due_on,dt)>0?dt:p.due_on-1,due_on:p.due_on,status:'active'});
+   s.loans.push({id:e.id,customer_id:p.customer_id,principal:Number(p.amount),original_amount:Number(p.amount),interest:0,annual_rate:0.30,accrued_through:addDays(p.due_on,-1),due_on:p.due_on,status:'active'});
    e.division='Loans';journal('principal',Number(p.amount));journal('cash',0,Number(p.amount));
  } else if(k==='repay'||k==='accrue'){
    const l=s.loans.find(x=>x.id===p.loan_id&&x.status==='active');
