@@ -12,9 +12,11 @@ export const compoundPeriods=(dueOn,date=today())=>{
 };
 export const compoundBalance=(principal,periods)=>round(Number(principal)*Math.pow(1.30,Math.max(0,Number(periods||0))));
 export const interest=(l,date=today())=>{
- const periods=compoundPeriods(l.due_on,date);
  const principal=Number(l.principal||0),existing=Number(l.interest||0);
- return round(Math.max(0,compoundBalance(principal+existing,periods)-principal-existing));
+ const totalPeriods=compoundPeriods(l.due_on,date);
+ const appliedPeriods=l.accrued_through&&l.accrued_through>=l.due_on?compoundPeriods(l.due_on,l.accrued_through):0;
+ const periods=Math.max(0,totalPeriods-appliedPeriods);
+ return round((principal+existing)*Math.pow(1.30,periods)-(principal+existing));
 };
 export const empty=()=>({role:'owner',products:[],customers:[],batches:[],events:[],invoices:[],loans:[],journal:[]});
 export const account=(s,a,ids)=>s.journal.filter(j=>j.account===a&&(!ids||ids.has(j.event_id))).reduce((n,j)=>n+Number(j.debit)-Number(j.credit),0);
