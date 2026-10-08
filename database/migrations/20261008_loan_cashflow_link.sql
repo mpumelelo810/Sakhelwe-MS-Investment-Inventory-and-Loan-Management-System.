@@ -89,3 +89,12 @@ $$;
 revoke all on function public.sakhelwe_loan_summary() from public;
 revoke all on function public.sakhelwe_loan_summary() from anon;
 grant execute on function public.sakhelwe_loan_summary() to authenticated;
+
+
+-- All authorized staff may read the lending fund so the loan balance is visible consistently.
+drop policy if exists "loan fund owner select" on public.sakhelwe_loan_fund_movements;
+create policy "loan fund staff select"
+on public.sakhelwe_loan_fund_movements
+for select
+to authenticated
+using ((select sakhelwe_private.role()) is not null);
