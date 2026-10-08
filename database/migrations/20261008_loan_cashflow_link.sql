@@ -93,6 +93,7 @@ grant execute on function public.sakhelwe_loan_summary() to authenticated;
 
 -- All authorized staff may read the lending fund so the loan balance is visible consistently.
 drop policy if exists "loan fund owner select" on public.sakhelwe_loan_fund_movements;
+drop policy if exists "loan fund staff select" on public.sakhelwe_loan_fund_movements;
 create policy "loan fund staff select"
 on public.sakhelwe_loan_fund_movements
 for select
