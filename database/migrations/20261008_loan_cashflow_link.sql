@@ -99,3 +99,31 @@ on public.sakhelwe_loan_fund_movements
 for select
 to authenticated
 using ((select sakhelwe_private.role()) is not null);
+
+-- Fixed Sakhelwe lending rule: 30% interest, compounded after each overdue period.
+create or replace function public.sakhelwe_apply_loan_interest(
+  p_loan_id uuid,
+  p_periods integer default 1
+)
+returns numeric
+language plpgsql
+security definer
+set search_path=''
+as $$
+declare
+  l public.sakhelwe_loans%rowtype;
+  old_balance numeric;
+  new_balance numeric;
+begin
+  select * into l from public.sakhelwe_loans where id=p_loan_id for update;
+  if not found or l.status <> 'active' then raise exception 'Active loan not found'; end if;
+  if p_periods < 1 then return l.principal+l.interest; end if;
+  old_balance := coalesce(l.principal,0)+coalesce(l.interest,0);
+  new_balance := round(old_balance * power(1.30,p_periods),2);
+  update public.sakhelwe_loans
+    set interest = new_balance - coalesce(principal,0)
+  where id=p_loan_id;
+  return new_balance;
+end;
+$$;
+grant execute on function public.sakhelwe_apply_loan_interest(uuid,integer) to authenticated;
