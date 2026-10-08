@@ -123,8 +123,8 @@ begin
   if p_quantity is null or p_quantity<=0 then
     raise exception 'Enter a valid quantity.';
   end if;
-  if p_unit_price is null or p_unit_price<=0 then
-    raise exception 'Enter a valid selling price.';
+  if p_unit_price is null or p_unit_price not in (80,85,90) then
+    raise exception 'Chicken price must be E80 Bundle, E85 Standard or E90 Normal.';
   end if;
 
   sale_total:=round(p_quantity*p_unit_price,2);
