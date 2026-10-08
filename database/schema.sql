@@ -10,8 +10,7 @@ create table public.sakhelwe_events (id uuid primary key default gen_random_uuid
 create table public.sakhelwe_batches (id uuid primary key default gen_random_uuid(), product_id uuid not null references public.sakhelwe_products, event_id uuid not null references public.sakhelwe_events, received_on date not null, supplier text not null default '', quantity numeric(16,3) not null check(quantity>0), total_cost numeric(16,2) not null check(total_cost>=0), remaining numeric(16,3) not null check(remaining>=0), remaining_cost numeric(16,2) not null check(remaining_cost>=0), age_weeks integer not null default 0 check(age_weeks>=0 and age_weeks<=200), sex text not null default 'Unknown' check(sex in ('Male','Female','Mixed','Unknown')), mortality numeric(16,3) not null default 0 check(mortality>=0 and mortality<=quantity));
 create table public.sakhelwe_stock_movements (id bigint generated always as identity primary key, event_id uuid not null references public.sakhelwe_events, batch_id uuid not null references public.sakhelwe_batches, quantity numeric(16,3) not null, value numeric(16,2) not null);
 create table public.sakhelwe_invoices (id uuid primary key references public.sakhelwe_events, customer_id uuid references public.sakhelwe_customers, total numeric(16,2) not null check(total>0), paid numeric(16,2) not null check(paid>=0 and paid<=total));
-create table public.sakhelwe_policies (id uuid primary key default gen_random_uuid(), name text not null, annual_rate numeric(9,6) not null check(annual_rate>=0 and annual_rate<=1), approved_by uuid not null references auth.users(id), approved_at timestamptz not null default now());
-create table public.sakhelwe_loans (id uuid primary key references public.sakhelwe_events, customer_id uuid not null references public.sakhelwe_customers, policy_id uuid not null references public.sakhelwe_policies, principal numeric(16,2) not null check(principal>=0), interest numeric(16,2) not null default 0 check(interest>=0), original_amount numeric(16,2) not null check(original_amount>0), annual_rate numeric(9,6) not null, accrued_through date not null, due_on date not null, status text not null default 'active' check(status in ('active','settled')));
+create table public.sakhelwe_loans (id uuid primary key references public.sakhelwe_events, customer_id uuid not null references public.sakhelwe_customers, principal numeric(16,2) not null check(principal>=0), interest numeric(16,2) not null default 0 check(interest>=0), original_amount numeric(16,2) not null check(original_amount>0), annual_rate numeric(9,6) not null, accrued_through date not null, due_on date not null, status text not null default 'active' check(status in ('active','settled')));
 create unique index sakhelwe_one_active_loan on public.sakhelwe_loans(customer_id) where status='active';
 create table public.sakhelwe_journal (id bigint generated always as identity primary key, event_id uuid not null references public.sakhelwe_events, account text not null check(account in ('cash','reserve','inventory','receivables','principal','interest_receivable','capital','revenue','cost_of_sales','expenses','interest_income')), debit numeric(16,2) not null default 0 check(debit>=0), credit numeric(16,2) not null default 0 check(credit>=0), check(debit=0 or credit=0));
 create index on public.sakhelwe_events(business_date);
@@ -19,14 +18,13 @@ create index on public.sakhelwe_batches(product_id,received_on,id);
 create index on public.sakhelwe_stock_movements(batch_id);
 create index on public.sakhelwe_journal(event_id);
 create index on public.sakhelwe_invoices(customer_id);
-create index on public.sakhelwe_loans(policy_id);
 create index on public.sakhelwe_batches(event_id);
 create index on public.sakhelwe_stock_movements(event_id);
 
 create function sakhelwe_private.role() returns text language sql stable security definer set search_path='' as $$ select role from public.sakhelwe_staff where user_id=(select auth.uid()) $$;
 revoke all on function sakhelwe_private.role() from public;
 grant execute on function sakhelwe_private.role() to authenticated;
-do $$ declare t text; begin foreach t in array array['staff','products','customers','events','batches','stock_movements','invoices','policies','loans','journal'] loop
+do $$ declare t text; begin foreach t in array array['staff','products','customers','events','batches','stock_movements','invoices','loans','journal'] loop
  execute format('alter table public.sakhelwe_%I enable row level security',t);
  execute format('revoke all on table public.sakhelwe_%I from anon, authenticated',t);
  execute format('grant select on table public.sakhelwe_%I to authenticated',t);
