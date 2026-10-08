@@ -39,7 +39,7 @@ declare
  actor_id uuid:=auth.uid(); staff_role text; e uuid; prior public.sakhelwe_events%rowtype;
  dt date:=(p->>'date')::date; division text:='Business'; label text; amt numeric(16,2):=0;
  qty numeric(16,3); age_weeks integer:=0; sex text:='Unknown'; pricing_qty numeric(16,3); cost numeric(16,2):=0; paid numeric(16,2):=0;
- prod public.sakhelwe_products%rowtype; batch public.sakhelwe_batches%rowtype; ln public.sakhelwe_loans%rowtype; inv public.sakhelwe_invoices%rowtype; policy public.sakhelwe_policies%rowtype;
+ prod public.sakhelwe_products%rowtype; batch public.sakhelwe_batches%rowtype; ln public.sakhelwe_loans%rowtype; inv public.sakhelwe_invoices%rowtype; policy public.sakhelwe_removed%rowtype;
  customer uuid; product uuid; b uuid; needed numeric; take numeric; part numeric(16,2); earn numeric(16,2); ip numeric(16,2); pp numeric(16,2); cash numeric;
 begin
  if actor_id is null then raise exception 'Please sign in.'; end if;
@@ -88,7 +88,7 @@ begin
  elsif k='policy' then
   if staff_role<>'owner' or (p->>'approved') is distinct from 'yes' then raise exception 'The owner must explicitly approve the loan terms.'; end if;
   if length(trim(coalesce(p->>'name','')))<2 then raise exception 'Enter a policy name.'; end if;
-  insert into public.sakhelwe_policies(name,annual_rate,approved_by) values(trim(p->>'name'),(p->>'annual_rate')::numeric/100,actor_id);
+  insert into public.sakhelwe_removed(name,annual_rate,approved_by) values(trim(p->>'name'),(p->>'annual_rate')::numeric/100,actor_id);
  elsif k not in ('capital','opening_stock','receive','sale','mortality','loss','expense','loan','repay','accrue','invoice_payment','reserve') then raise exception 'Unknown transaction type.';
  end if;
  if k in ('capital','reserve','loan','policy') and staff_role<>'owner' then raise exception 'Only the owner can perform this action.'; end if;
@@ -150,10 +150,8 @@ begin
  elsif k='loan' then
   if customer is null then raise exception 'Register and select a customer first.'; end if;
   if exists(select 1 from public.sakhelwe_loans where customer_id=customer and status='active') or exists(select 1 from public.sakhelwe_invoices i where i.customer_id=customer and i.paid<i.total) then raise exception 'This customer must clear existing debt before a new loan.'; end if;
-  select * into policy from public.sakhelwe_policies where id=(p->>'policy_id')::uuid;
-  if not found then raise exception 'Select an owner-approved loan policy.'; end if;
   if (p->>'due_on')::date<dt or p->>'due_on' is null then raise exception 'Due date must be on or after the loan date.'; end if;
-  insert into public.sakhelwe_loans(id,customer_id,policy_id,principal,original_amount,annual_rate,accrued_through,due_on) values(e,customer,policy.id,amt,amt,policy.annual_rate,dt,(p->>'due_on')::date);
+  insert into public.sakhelwe_loans(id,customer_id,principal,interest,original_amount,annual_rate,accrued_through,due_on) values(e,customer,amt,0,amt,0.30,dt,(p->>'due_on')::date);
   perform sakhelwe_private.journal(e,'principal',amt,0); perform sakhelwe_private.journal(e,'cash',0,amt);
  elsif k in ('repay','accrue') then
   select * into ln from public.sakhelwe_loans where id=(p->>'loan_id')::uuid for update;
@@ -190,7 +188,7 @@ begin
  'events',coalesce((select jsonb_agg(x order by x.business_date desc,x.created_at desc) from public.sakhelwe_events x),'[]'::jsonb),
  'batches',coalesce((select jsonb_agg(x) from public.sakhelwe_batches x),'[]'::jsonb),
  'invoices',coalesce((select jsonb_agg(x) from public.sakhelwe_invoices x),'[]'::jsonb),
- 'policies',coalesce((select jsonb_agg(x) from public.sakhelwe_policies x),'[]'::jsonb),
+ 'policies',coalesce((select jsonb_agg(x) from public.sakhelwe_removed x),'[]'::jsonb),
  'loans',coalesce((select jsonb_agg(x) from public.sakhelwe_loans x),'[]'::jsonb),
  'journal',coalesce((select jsonb_agg(x) from public.sakhelwe_journal x),'[]'::jsonb));
 end $$;
