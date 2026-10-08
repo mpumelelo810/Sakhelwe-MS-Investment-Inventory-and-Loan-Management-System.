@@ -4,8 +4,19 @@ export const round=n=>Math.round((n+Number.EPSILON)*100)/100;
 export const ageWeeks=(b,date=today())=>Math.max(0,Number(b.age_weeks||0)+Math.floor(days(b.received_on,date)/7));
 export const ageCategory=(division,weeks)=>{const w=Number(weeks||0);return division==='Poultry'?(w<=6?'Chicks (0–6 weeks)':w<=18?'Growers (7–18 weeks)':'Adults (19+ weeks)'):(w<=8?'Piglets (0–8 weeks)':w<=20?'Growers (9–20 weeks)':'Adults (21+ weeks)');};
 export const days=(a,b)=>Math.max(0,Math.round((new Date(b+'T12:00:00Z')-new Date(a+'T12:00:00Z'))/86400000));
-export const interest=(l,date=today())=>round(Number(l.principal)*Number(l.annual_rate)*days(l.accrued_through,date)/365);
-export const empty=()=>({role:'owner',products:[],customers:[],batches:[],events:[],invoices:[],policies:[],loans:[],journal:[]});
+export const compoundPeriods=(dueOn,date=today())=>{
+ if(!dueOn||date<dueOn)return 0;
+ let n=0,d=dueOn;
+ while(d<=date){n++;const next=new Date(d+'T12:00:00Z');next.setUTCMonth(next.getUTCMonth()+1);d=next.toISOString().slice(0,10);}
+ return n;
+};
+export const compoundBalance=(principal,periods)=>round(Number(principal)*Math.pow(1.30,Math.max(0,Number(periods||0))));
+export const interest=(l,date=today())=>{
+ const periods=compoundPeriods(l.due_on,date);
+ const principal=Number(l.principal||0),existing=Number(l.interest||0);
+ return round(Math.max(0,compoundBalance(principal+existing,periods)-principal-existing));
+};
+export const empty=()=>({role:'owner',products:[],customers:[],batches:[],events:[],invoices:[],loans:[],journal:[]});
 export const account=(s,a,ids)=>s.journal.filter(j=>j.account===a&&(!ids||ids.has(j.event_id))).reduce((n,j)=>n+Number(j.debit)-Number(j.credit),0);
 export function totals(s,month,division='All sections'){
  const es=s.events.filter(e=>e.business_date.startsWith(month)&&(division==='All sections'||e.division===division));const ids=new Set(es.map(e=>e.id));
@@ -38,17 +49,14 @@ export function demoPost(s,k,p,key){
    if(!prod||!(q>0)||(prod.unit==='each'&&!Number.isInteger(q)))throw Error('Check the product and stock quantity.');
    e.division=prod.division;
  }
- if(['capital','reserve','loan','policy','product','opening_stock'].includes(k)&&s.role!=='owner')throw Error('Only the owner can perform this action.');
+ if(['capital','reserve','loan','product','opening_stock'].includes(k)&&s.role!=='owner')throw Error('Only the owner can perform this action.');
 
  if(k==='product'){
    if(s.products.some(x=>x.name===p.name))throw Error('A product with this name already exists.');
    s.products.push({id:crypto.randomUUID(),name:p.name,unit:p.unit,division:p.division,threshold:Number(p.threshold)});
  } else if(k==='customer'){
    s.customers.push({id:crypto.randomUUID(),name:p.name,phone:p.phone});
- } else if(k==='policy'){
-   if(p.approved!=='yes'||Number(p.annual_rate)<0||Number(p.annual_rate)>100)throw Error('Confirm the approved rate, between 0 and 100%.');
-   s.policies.push({id:crypto.randomUUID(),name:p.name,annual_rate:Number(p.annual_rate)/100});
- } else if(k==='capital'){
+  } else if(k==='capital'){
    journal('cash',Number(p.amount)); journal('capital',0,Number(p.amount));
  } else if(k==='opening_stock'||k==='receive'){
    const age=Number(p.age_weeks||0);
