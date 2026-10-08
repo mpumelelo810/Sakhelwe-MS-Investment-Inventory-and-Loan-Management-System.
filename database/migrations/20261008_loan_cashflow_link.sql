@@ -127,3 +127,50 @@ begin
 end;
 $$;
 grant execute on function public.sakhelwe_apply_loan_interest(uuid,integer) to authenticated;
+
+
+-- Automatically apply the fixed 30% compound interest when the app is opened.
+-- The production database also uses the updated transaction posting function so loans
+-- no longer depend on user-created policies.
+create or replace function public.sakhelwe_apply_due_interest()
+returns jsonb
+language plpgsql
+security definer
+set search_path=''
+as $$
+declare
+ l public.sakhelwe_loans%rowtype;
+ periods integer;
+ compound_date date;
+ balance numeric;
+ old_balance numeric;
+ applied integer := 0;
+ total_periods integer := 0;
+begin
+ if (select auth.uid()) is null then raise exception 'Please sign in.'; end if;
+ if not exists(select 1 from public.sakhelwe_staff where user_id=(select auth.uid())) then raise exception 'Not authorized.'; end if;
+ for l in select * from public.sakhelwe_loans where status='active' for update loop
+  if current_date < l.due_on then continue; end if;
+  periods := 0;
+  compound_date := l.due_on;
+  while compound_date <= current_date loop
+   if compound_date > coalesce(l.accrued_through,l.due_on-1) then periods := periods + 1; end if;
+   compound_date := (compound_date + interval '1 month')::date;
+  end loop;
+  if periods > 0 then
+   old_balance := l.principal+l.interest;
+   balance := round(old_balance*power(1.30,periods),2);
+   update public.sakhelwe_loans
+   set interest=balance-principal,
+       accrued_through=(l.due_on + make_interval(months => periods-1))::date
+   where id=l.id;
+   applied := applied + 1;
+   total_periods := total_periods + periods;
+  end if;
+ end loop;
+ return jsonb_build_object('loans_updated',applied,'periods_applied',total_periods);
+end;
+$$;
+revoke all on function public.sakhelwe_apply_due_interest() from public;
+revoke all on function public.sakhelwe_apply_due_interest() from anon;
+grant execute on function public.sakhelwe_apply_due_interest() to authenticated;
