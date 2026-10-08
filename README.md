@@ -43,7 +43,7 @@ All 18 automated tests pass, covering ledger integrity, permissions, verified-ow
 
 ## Limits
 
-This app records money; it does not transfer funds. Remaining controls include authorized ledger corrections, opening legacy balances, period closing, evidence uploads, cash-account separation, expense allocation, backup/restore rehearsal and deployed authenticated acceptance. VAT and statutory financial reports are not calculated. Loan policy must be explicitly approved before lending is enabled.
+This app records money; it does not transfer funds. Remaining controls include authorized ledger corrections, opening legacy balances, period closing, evidence uploads, cash-account separation, expense allocation, backup/restore rehearsal and deployed authenticated acceptance. VAT and statutory financial reports are not calculated. Loan interest is fixed at 30% per month and compounds automatically from the due date.
 
 
 ## Chicken batch cycle accounting
