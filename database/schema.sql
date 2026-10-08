@@ -149,7 +149,7 @@ begin
   if customer is null then raise exception 'Register and select a customer first.'; end if;
   if exists(select 1 from public.sakhelwe_loans where customer_id=customer and status='active') or exists(select 1 from public.sakhelwe_invoices i where i.customer_id=customer and i.paid<i.total) then raise exception 'This customer must clear existing debt before a new loan.'; end if;
   if (p->>'due_on')::date<dt or p->>'due_on' is null then raise exception 'Due date must be on or after the loan date.'; end if;
-  insert into public.sakhelwe_loans(id,customer_id,principal,interest,original_amount,annual_rate,accrued_through,due_on) values(e,customer,amt,0,amt,0.30,dt,(p->>'due_on')::date);
+  insert into public.sakhelwe_loans(id,customer_id,principal,interest,original_amount,annual_rate,accrued_through,due_on) values(e,customer,amt,0,amt,0.30,(p->>'due_on')::date-1,(p->>'due_on')::date);
   perform sakhelwe_private.journal(e,'principal',amt,0); perform sakhelwe_private.journal(e,'cash',0,amt);
  elsif k in ('repay','accrue') then
   select * into ln from public.sakhelwe_loans where id=(p->>'loan_id')::uuid for update;
