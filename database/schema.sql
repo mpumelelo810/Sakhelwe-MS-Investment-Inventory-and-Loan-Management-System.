@@ -39,7 +39,7 @@ declare
  actor_id uuid:=auth.uid(); staff_role text; e uuid; prior public.sakhelwe_events%rowtype;
  dt date:=(p->>'date')::date; division text:='Business'; label text; amt numeric(16,2):=0;
  qty numeric(16,3); age_weeks integer:=0; sex text:='Unknown'; pricing_qty numeric(16,3); cost numeric(16,2):=0; paid numeric(16,2):=0;
- prod public.sakhelwe_products%rowtype; batch public.sakhelwe_batches%rowtype; ln public.sakhelwe_loans%rowtype; inv public.sakhelwe_invoices%rowtype; policy public.sakhelwe_removed%rowtype;
+ prod public.sakhelwe_products%rowtype; batch public.sakhelwe_batches%rowtype; ln public.sakhelwe_loans%rowtype; inv public.sakhelwe_invoices%rowtype;
  customer uuid; product uuid; b uuid; needed numeric; take numeric; part numeric(16,2); earn numeric(16,2); ip numeric(16,2); pp numeric(16,2); cash numeric;
 begin
  if actor_id is null then raise exception 'Please sign in.'; end if;
@@ -87,8 +87,6 @@ begin
   insert into public.sakhelwe_customers(name,phone) values(trim(p->>'name'),coalesce(p->>'phone',''));
  elsif k='policy' then
   if staff_role<>'owner' or (p->>'approved') is distinct from 'yes' then raise exception 'The owner must explicitly approve the loan terms.'; end if;
-  if length(trim(coalesce(p->>'name','')))<2 then raise exception 'Enter a policy name.'; end if;
-  insert into public.sakhelwe_removed(name,annual_rate,approved_by) values(trim(p->>'name'),(p->>'annual_rate')::numeric/100,actor_id);
  elsif k not in ('capital','opening_stock','receive','sale','mortality','loss','expense','loan','repay','accrue','invoice_payment','reserve') then raise exception 'Unknown transaction type.';
  end if;
  if k in ('capital','reserve','loan','policy') and staff_role<>'owner' then raise exception 'Only the owner can perform this action.'; end if;
