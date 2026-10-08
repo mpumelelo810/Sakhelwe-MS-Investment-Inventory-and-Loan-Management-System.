@@ -28,36 +28,6 @@ begin
 end;
 $$;
 
--- Treat the obsolete transaction kind as unknown rather than exposing a legacy branch.
-do $$
-declare ddl text;
-begin
-  select pg_get_functiondef('sakhelwe_private.post(text,jsonb,uuid)'::regprocedure) into ddl;
-  ddl:=replace(
-    ddl,
-    $$ elsif k='policy' then
-  raise exception 'Loan policies are no longer used. Sakhelwe loans use a fixed 30%% monthly compound interest rule.';
-$$,
-    ''
-  );
-  execute ddl;
-end;
-$$;
-
--- A new loan starts accruing just before its due date so the due date is the first 30% compounding date.
-do $
-declare ddl text;
-begin
-  select pg_get_functiondef('sakhelwe_private.post(text,jsonb,uuid)'::regprocedure) into ddl;
-  ddl:=replace(
-    ddl,
-    $values(e,customer,amt,0,amt,0.30,dt,(p->>'due_on')::date);$,
-    $values(e,customer,amt,0,amt,0.30,(p->>'due_on')::date-1,(p->>'due_on')::date);$
-  );
-  execute ddl;
-end;
-$;
-
 -- Owner/cashier can create chicken batches; only the owner can delete them.
 drop policy if exists "owner chicken batches" on public.sakhelwe_chicken_batches;
 drop policy if exists "chicken_batches_read" on public.sakhelwe_chicken_batches;
