@@ -109,7 +109,7 @@ export function demoPost(s,k,p,key){
    if(!s.customers.some(x=>x.id===p.customer_id))throw Error('Select a registered customer.');
    if(s.loans.some(l=>l.customer_id===p.customer_id&&l.status==='active')||s.invoices.some(i=>i.customer_id===p.customer_id&&i.paid<i.total))throw Error('This customer must clear existing debt first.');
    if(p.due_on<dt)throw Error('Check the due date.');
-   s.loans.push({id:e.id,customer_id:p.customer_id,principal:Number(p.amount),original_amount:Number(p.amount),interest:0,annual_rate:0.30,accrued_through:dt,due_on:p.due_on,status:'active'});
+   s.loans.push({id:e.id,customer_id:p.customer_id,principal:Number(p.amount),original_amount:Number(p.amount),interest:0,annual_rate:0.30,accrued_through:days(p.due_on,dt)>0?dt:p.due_on-1,due_on:p.due_on,status:'active'});
    e.division='Loans';journal('principal',Number(p.amount));journal('cash',0,Number(p.amount));
  } else if(k==='repay'||k==='accrue'){
    const l=s.loans.find(x=>x.id===p.loan_id&&x.status==='active');
