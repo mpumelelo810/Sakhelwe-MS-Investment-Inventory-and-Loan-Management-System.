@@ -18,7 +18,7 @@ export function syncRun(user,rpc){if(running.has(user))return running.get(user);
 function normalisePayload(payload){
  const next=structuredClone(payload||{});
  // Optional foreign keys must never be sent as an empty UUID string.
- for(const field of ['product_id','customer_id','invoice_id','loan_id','policy_id']){
+ for(const field of ['product_id','customer_id','invoice_id','loan_id']){
   if(field in next && (next[field]===null || String(next[field]).trim()==='')) next[field]=null;
  }
  return next;
