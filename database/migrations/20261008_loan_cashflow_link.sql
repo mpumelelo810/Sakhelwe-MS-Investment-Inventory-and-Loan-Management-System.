@@ -4,11 +4,17 @@
 create or replace function public.sakhelwe_loan_summary()
 returns jsonb
 language sql
-security invoker
+security definer
 set search_path=''
 stable
 as $$
-with fund as (
+with authorized as (
+  select exists(
+    select 1 from public.sakhelwe_staff
+    where user_id=(select auth.uid())
+  ) as ok
+),
+fund as (
   select
     coalesce(sum(case when movement_type in ('opening','in') then amount else 0 end),0) as added,
     coalesce(sum(case when movement_type='out' then amount else 0 end),0) as legacy_out
@@ -49,7 +55,7 @@ customers as (
     ),0) as chicken_sales_balance
   from public.sakhelwe_customers c
 )
-select jsonb_build_object(
+select case when authorized.ok then jsonb_build_object(
   'fund_added', round(fund.added,2),
   'legacy_manual_out', round(fund.legacy_out,2),
   'money_in', round(loan_in.amount,2),
@@ -76,8 +82,8 @@ select jsonb_build_object(
       ),
       '[]'::jsonb
     )
-)
-from fund, loan_out, loan_in, outstanding;
+) else '{}'::jsonb end
+from authorized, fund, loan_out, loan_in, outstanding;
 $$;
 
 revoke all on function public.sakhelwe_loan_summary() from public;
