@@ -143,7 +143,7 @@ const dateRange=range=>({
  fromDate:range?.fromDate||range?.from||null,
  toDate:range?.toDate||range?.to||null
 });
-const validDate=date=>typeof date==='string'&&/^\\d{4}-\\d{2}-\\d{2}$/.test(date)&&!Number.isNaN(new Date(date+'T12:00:00Z').getTime());
+const validDate=date=>typeof date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(date)&&!Number.isNaN(new Date(date+'T12:00:00Z').getTime());
 const kindOf=event=>String(event?.kind||event?.event_type||event?.type||'').toLowerCase();
 const eventQuantity=event=>Math.max(0,Number(event?.payload?.quantity??event?.quantity??0));
 const eventDate=event=>event?.business_date||event?.date||null;
