@@ -68,3 +68,29 @@ test('empty farms return zero stock, zero age mix and zero mortality',()=>{
  assert.deepEqual(ageMix(state,'Pigs','2026-09-03').categories.map(x=>x.count),[0,0,0]);
  assert.equal(mortalityRate(state,'Pigs').rate,0);
 });
+
+
+test('replayed stock and age mix reconcile with FIFO batch balances',()=>{
+ const state={
+  products:[{id:'p',name:'Porkers',division:'Pigs',unit:'each'}],
+  batches:[
+   {id:'b1',product_id:'p',received_on:'2026-09-01',quantity:10,remaining:0,age_weeks:0},
+   {id:'b2',product_id:'p',received_on:'2026-09-04',quantity:20,remaining:16,age_weeks:0}
+  ],
+  events:[
+   {id:'r1',kind:'opening_stock',division:'Pigs',business_date:'2026-09-01',payload:{product_id:'p',quantity:10}},
+   {id:'r2',kind:'receive',division:'Pigs',business_date:'2026-09-04',payload:{product_id:'p',quantity:20}},
+   {id:'s1',kind:'sale',division:'Pigs',business_date:'2026-09-05',payload:{product_id:'p',quantity:12}},
+   {id:'m1',kind:'mortality',division:'Pigs',business_date:'2026-09-06',payload:{product_id:'p',quantity:2}}
+  ]
+ };
+ const end=stockTimeline(state,'Pigs','2026-09-01','2026-09-06').at(-1);
+ assert.equal(end.balance,state.batches.reduce((n,b)=>n+Number(b.remaining),0));
+ const mix=ageMix(state,'Pigs','2026-09-06');
+ assert.equal(mix.total,end.balance);
+ const rate=mortalityRate(state,'Pigs',{fromDate:'2026-09-01',toDate:'2026-09-06'});
+ assert.equal(rate.totalEntered,30);
+ assert.equal(rate.totalDeaths,2);
+ assert.equal(rate.batches.find(b=>b.batchId==='b1').deaths,0);
+ assert.equal(rate.batches.find(b=>b.batchId==='b2').deaths,2);
+});
