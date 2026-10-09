@@ -285,22 +285,37 @@ export function ageMix(state,division,date=today()){
  * those same batches in that window. With no range, all recorded batches apply.
  */
 export function mortalityRate(state,division,range={}){
- const {fromDate,toDate}=dateRange(range);
+ const {fromDate}=dateRange(range),toDate=validDate(range?.toDate||range?.to)?(range.toDate||range.to):today();
  const customChicken=isChicken(division)&&Array.isArray(state?.chickenBatches);
  let batches=[];
  if(customChicken){
   batches=(state.chickenBatches||[]).filter(b=>inWindow(b.received_on,fromDate,toDate)).map(b=>{
+   const entered=initialBatchQuantity(b);
    const deaths=(state.chickenMortality||[]).filter(e=>e.batch_id===b.id&&inWindow(e.death_date||e.business_date,fromDate,toDate)).reduce((n,e)=>n+Number(e.quantity||0),0);
-   return {batchId:b.id,label:b.batch_name||b.received_on,entered:initialBatchQuantity(b),deaths,rate:initialBatchQuantity(b)?deaths/initialBatchQuantity(b)*100:0};
+   return {batchId:b.id,label:b.batch_name||b.received_on,entered,deaths,rate:entered?deaths/entered*100:0};
   });
  } else {
-  const productDivision=(id)=>divisionForProduct(state,id);
-  const entered=(state.batches||[]).filter(b=>(b.division||productDivision(b.product_id))===division&&inWindow(b.received_on,fromDate,toDate));
-  batches=entered.map(b=>{
-   const deaths=(state.events||[]).filter(e=>isDeathKind(kindOf(e))&&eventDivision(state,e)===division&&
-    (!e.payload?.product_id&&!e.product_id|| (e.payload?.product_id||e.product_id)===b.product_id)&&
-    inWindow(eventDate(e),fromDate,toDate)).reduce((n,e)=>n+eventQuantity(e),0);
-   return {batchId:b.id,label:b.received_on,entered:initialBatchQuantity(b),deaths,rate:initialBatchQuantity(b)?deaths/initialBatchQuantity(b)*100:0};
+  const products=new Map((state?.products||[]).map(p=>[p.id,p]));
+  const inventory=(state?.batches||[]).filter(b=>(b.division||products.get(b.product_id)?.division)===division&&validDate(b.received_on)&&b.received_on<=toDate)
+   .map(b=>({...b,remainingForReplay:initialBatchQuantity(b),deathsInRange:0}))
+   .sort((a,b)=>a.received_on.localeCompare(b.received_on)||String(a.id).localeCompare(String(b.id)));
+  const outcomes=(state?.events||[]).filter(e=>{
+   const k=kindOf(e),date=eventDate(e);
+   return validDate(date)&&date<=toDate&&(isSaleKind(k)||isDeathKind(k)||isLossKind(k))&&eventDivision(state,e)===division;
+  }).sort((a,b)=>eventDate(a).localeCompare(eventDate(b))||String(a.id).localeCompare(String(b.id)));
+  for(const e of outcomes){
+   let need=eventQuantity(e);if(!need)continue;
+   const k=kindOf(e),date=eventDate(e),productId=e.payload?.product_id||e.product_id,directId=e.payload?.batch_id||e.batch_id;
+   const candidates=inventory.filter(b=>(!directId||b.id===directId)&&(!productId||b.product_id===productId)&&b.received_on<=date&&b.remainingForReplay>0);
+   for(const b of candidates){
+    const take=Math.min(need,b.remainingForReplay);
+    if(isDeathKind(k)&&inWindow(date,fromDate,toDate))b.deathsInRange+=take;
+    b.remainingForReplay-=take;need-=take;if(need<=0)break;
+   }
+  }
+  batches=inventory.filter(b=>inWindow(b.received_on,fromDate,toDate)).map(b=>{
+   const entered=initialBatchQuantity(b),deaths=b.deathsInRange;
+   return {batchId:b.id,label:b.received_on,entered,deaths,rate:entered?deaths/entered*100:0};
   });
  }
  const totalEntered=batches.reduce((n,b)=>n+b.entered,0),totalDeaths=batches.reduce((n,b)=>n+b.deaths,0);
