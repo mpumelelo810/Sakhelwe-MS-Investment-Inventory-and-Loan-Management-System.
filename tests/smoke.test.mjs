@@ -60,3 +60,17 @@ test("Excel report export creates a readable multi-sheet XLSX package",async()=>
   URL.createObjectURL=originalCreate;URL.revokeObjectURL=originalRevoke;
  }
 });
+
+
+test("Desktop installation and offline reconnect sync are configured",async()=>{
+ const [app,sync,manifest,pkg,offlineBuilder]=await Promise.all(["src/main.jsx","src/sync.js","public/manifest.webmanifest","package.json","scripts/offline-build.py"].map(p=>readFile(p,"utf8")));
+ assert.match(app,/navigator\.serviceWorker\.register\("\/sw\.js"\)/);
+ assert.match(app,/beforeinstallprompt/);
+ assert.match(app,/sakhelwe_sync_post/);
+ assert.match(app,/__table_insert/);
+ assert.match(app,/Offline — showing the last synced records/);
+ assert.match(sync,/syncSaveWorkspace/);
+ assert.match(manifest,/"display": "standalone"/);
+ assert.match(pkg,/"build": "vite build && python3 scripts\/offline-build\.py"/);
+ assert.match(offlineBuilder,/dist\/sw\.js/);
+});
