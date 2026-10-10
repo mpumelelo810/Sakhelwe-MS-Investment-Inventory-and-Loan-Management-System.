@@ -7,7 +7,7 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build && python3 scripts/offline-build.py",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "npm run build && node --test tests/smoke.test.mjs tests/model.test.mjs"
+    "test": "npm run build && node --test tests/smoke.test.mjs tests/model.test.mjs tests/sync.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.117.2",
