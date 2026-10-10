@@ -75,3 +75,13 @@ test("Desktop installation and offline reconnect sync are configured",async()=>{
  assert.match(pkg,/"build": "vite build && python3 scripts\/offline-build\.py"/);
  assert.match(offlineBuilder,/\(dist\/\x27sw\.js\x27\)/);
 });
+test("Desktop data loading is bounded and renders cloud data before waiting for queue sync",async()=>{
+ const [app,offlineBuilder]=await Promise.all(["src/main.jsx","scripts/offline-build.py"].map(p=>readFile(p,"utf8")));
+ assert.match(app,/REQUEST_TIMEOUT_MS=20000/);
+ assert.match(app,/global:\{fetch:fetchWithTimeout\}/);
+ assert.match(app,/db:\{retry:false\}/);
+ assert.match(app,/syncSaveWorkspace\(sess\.user\.id,next\)\.catch/);
+ assert.match(app,/const refresh=async\(\)=>\{await refreshPending\(\);const before=await syncRead\(sess\.user\.id\)\.catch\(\(\)=>null\);if\(active\)await load\(\)/);
+ assert.match(offlineBuilder,/self\.skipWaiting\(\)/);
+ assert.match(offlineBuilder,/self\.clients\.claim\(\)/);
+});
