@@ -321,3 +321,27 @@ export function mortalityRate(state,division,range={}){
  const totalEntered=batches.reduce((n,b)=>n+b.entered,0),totalDeaths=batches.reduce((n,b)=>n+b.deaths,0);
  return {division,fromDate,toDate,totalEntered,totalDeaths,rate:totalEntered?totalDeaths/totalEntered*100:0,batches};
 }
+
+/**
+ * One source of truth for the monthly enterprise summary shown on Home and Reports.
+ * Keeps all four businesses on the existing ledger and avoids page-specific totals.
+ */
+export const enterpriseMonthlySummary=({month,events=[],journal=[],sales=[],batches=[],expenses=[]})=>{
+ const periodEvents=events.filter(e=>String(e.business_date||"").startsWith(month));
+ const rows=["Poultry","Pigs","Business","Loans"].map(section=>{
+  const es=periodEvents.filter(e=>String(e.division||"Business").toLowerCase()===section.toLowerCase()||(section==="Poultry"&&["Chicken","Chickens"].includes(e.division)));
+  const ids=new Set(es.map(e=>e.id)),sj=journal.filter(x=>ids.has(x.event_id));
+  const genericSales=es.filter(e=>e.kind==="sale"||e.kind==="income").reduce((n,e)=>n+Number(e.amount||0),0);
+  const genericExpenses=es.filter(e=>e.kind==="expense").reduce((n,e)=>n+Number(e.amount||0),0);
+  const cogs=sj.filter(x=>x.account==="cost_of_sales").reduce((n,x)=>n+Number(x.debit||0)-Number(x.credit||0),0);
+  const loanIncome=sj.filter(x=>x.account==="interest_income").reduce((n,x)=>n+Number(x.credit||0)-Number(x.debit||0),0);
+  const poultrySales=sales.filter(x=>String(x.sale_date||"").startsWith(month)).reduce((n,x)=>n+Number(x.total||0),0);
+  const batchCosts=batches.filter(b=>String(b.received_on||"").startsWith(month)).reduce((n,b)=>n+Number(b.initial_quantity||0)*Number(b.unit_cost||0),0);
+  const chickenExpenseCosts=expenses.filter(x=>String(x.expense_date||"").startsWith(month)).reduce((n,x)=>n+Number(x.amount||0),0);
+  const revenue=section==="Poultry"?poultrySales+genericSales:section==="Loans"?loanIncome+genericSales:genericSales;
+  const costs=section==="Poultry"?batchCosts+chickenExpenseCosts+genericExpenses+cogs:genericExpenses+cogs;
+  return{section,revenue,costs,profit:revenue-costs};
+ });
+ const totalSales=rows.reduce((n,r)=>n+r.revenue,0),totalCosts=rows.reduce((n,r)=>n+r.costs,0);
+ return{month,rows,totalSales,totalCosts,totalProfit:totalSales-totalCosts};
+};
