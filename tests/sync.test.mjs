@@ -26,7 +26,12 @@ test('outbox falls back to persistent localStorage when IndexedDB is unavailable
   const migrated=await syncRead(user);
   assert.equal(migrated.queue.length,1);
   assert.equal(migrated.queue[0].key,'fallback-1');
-  assert.equal(map.has('sakhelwe-cloud-sync:'+user),false);
+  assert.equal(map.has('sakhelwe-cloud-sync:'+user),true);
+  assert.equal(JSON.parse(map.get('sakhelwe-cloud-sync:'+user)).queue.length,1);
+  await syncRun(user,s.rpc);
+  assert.equal((await syncRead(user)).queue.length,0);
+  assert.equal(s.count(),1);
+  assert.equal(JSON.parse(map.get('sakhelwe-cloud-sync:'+user)).queue.length,0);
  }finally{
   if(originalIdb)Object.defineProperty(globalThis,'indexedDB',originalIdb);
   else delete globalThis.indexedDB;
