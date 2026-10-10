@@ -69,6 +69,7 @@ test("Desktop installation and offline reconnect sync are configured",async()=>{
  assert.match(app,/sakhelwe_sync_post/);
  assert.match(app,/__table_insert/);
  assert.match(app,/Offline — showing the last synced records/);
+ assert.match(app,/setInterval\(visibleAgain,30000\)/);
  assert.match(sync,/syncSaveWorkspace/);
  assert.match(manifest,/"display": "standalone"/);
  assert.match(pkg,/"build": "vite build && python3 scripts\/offline-build\.py"/);
