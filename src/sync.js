@@ -45,7 +45,7 @@ async function change(user,fn){
     try{
      const doc=mergeDocs(r.result||blank(),readLocal(user));
      answer=fn(doc);store.put(doc,user);
-    }catch(e){failure=e;try{tx.abort()}catch{}}
+    }catch(e){failure=Object.assign(new Error(e?.message||"Offline queue operation failed."),{cause:e,skipFallback:true});try{tx.abort()}catch{}}
    };
    r.onerror=()=>{failure=r.error;try{tx.abort()}catch{}};
    tx.oncomplete=()=>resolve(answer);
@@ -55,10 +55,10 @@ async function change(user,fn){
   try{if(typeof localStorage!=='undefined')localStorage.removeItem(localKey(user))}catch{}
   return result;
  }catch(idbError){
-  try{
-   const doc=readLocal(user)||blank(),result=fn(doc);
-   writeLocal(user,doc);return result;
-  }catch(localError){
+  if(idbError?.skipFallback)throw idbError.cause||idbError;
+  const doc=readLocal(user)||blank();let result;
+  try{result=fn(doc)}catch(validationError){throw validationError}
+  try{writeLocal(user,doc);return result}catch(localError){
    throw new Error('Could not save or read the offline workspace. '+(localError?.message||idbError?.message||'Local storage is unavailable.'));
   }
  }finally{try{db?.close()}catch{}}
@@ -101,7 +101,7 @@ async function run(user,rpc){
  await change(user,d=>{d.snapshot=snapshot;d.updatedAt=new Date().toISOString()});
  while(true){
   const doc=await syncRead(user),entry=doc.queue[0];if(!entry)break;
-  if(entry.error)await change(user,d=>{const first=d.queue.find(x=>x.key===entry.key);if(first)first.error=null});
+  if(entry.error)throw Error(entry.error);
   try{await rpc('sakhelwe_post',{kind:entry.kind,payload:normalisePayload(entry.payload),request_key:entry.key})}
   catch(e){
    if(e.code&&!['PGRST000','PGRST001','PGRST002','PGRST003','57014','53300','57P01'].includes(e.code)&&!String(e.code).startsWith('08'))
