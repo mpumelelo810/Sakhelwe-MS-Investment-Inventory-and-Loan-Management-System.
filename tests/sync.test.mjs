@@ -3,3 +3,34 @@ function server(){let state=empty(),commits=new Map(),fail=null;return {setFail:
 test('offline outbox survives reconnect and lost response retries without duplicates',async()=>{const s=server(),user='sync-owner';await syncRun(user,s.rpc);await syncEnqueue(user,'capital',{date:'2026-10-01',amount:'100'},'request-1');s.setFail('lost');await assert.rejects(syncRun(user,s.rpc),/Connection lost/);assert.equal((await syncRead(user)).queue.length,1);assert.equal(s.count(),1);await syncRun(user,s.rpc);assert.equal(s.count(),1);assert.equal((await syncRead(user)).queue.length,0);assert.equal((await syncRead(user)).snapshot.events.length,1);});
 test('conflicts retain pending entries and stop subsequent posting until explicit retry',async()=>{const s=server(),user='sync-conflict';await syncRun(user,s.rpc);await syncEnqueue(user,'sale',{date:'2026-10-01'},'conflict-1');await syncEnqueue(user,'capital',{date:'2026-10-01'},'conflict-2');s.setFail('reject');await assert.rejects(syncRun(user,s.rpc),/Not enough stock/);assert.equal((await syncRead(user)).queue.length,2);s.setFail(null);await assert.rejects(syncRun(user,s.rpc),/Not enough stock/);assert.equal(s.count(),0);await syncRetry(user);await syncRun(user,s.rpc);assert.equal(s.count(),2);});
 test('cache and outboxes are per user, first offline use blocked and backup retains pending payload',async()=>{await assert.rejects(syncEnqueue('never-signed-in','capital',{},'no-init'),/Connect once/);const s=server();await syncRun('owner-a',s.rpc);await syncRun('owner-b',s.rpc);await syncEnqueue('owner-a','capital',{amount:'20'},'a-1');assert.equal((await syncRead('owner-b')).queue.length,0);assert.equal(JSON.parse(await syncBackup('owner-a')).queue[0].payload.amount,'20');await syncEnqueue('owner-a','capital',{amount:'20'},'a-1');assert.equal((await syncRead('owner-a')).queue.length,1);await assert.rejects(syncEnqueue('owner-a','capital',{amount:'30'},'a-1'),/already used/);});
+
+test('outbox falls back to persistent localStorage when IndexedDB is unavailable, then merges into IndexedDB when it returns',async()=>{
+ const originalIdb=Object.getOwnPropertyDescriptor(globalThis,'indexedDB');
+ const originalStorage=Object.getOwnPropertyDescriptor(globalThis,'localStorage');
+ const map=new Map();
+ Object.defineProperty(globalThis,'indexedDB',{configurable:true,writable:true,value:undefined});
+ Object.defineProperty(globalThis,'localStorage',{configurable:true,writable:true,value:{
+  getItem:key=>map.has(key)?map.get(key):null,
+  setItem:(key,value)=>map.set(key,String(value)),
+  removeItem:key=>map.delete(key)
+ }});
+ const user='fallback-owner',s=server();
+ try{
+  await syncRun(user,s.rpc);
+  await syncEnqueue(user,'capital',{date:'2026-10-10',amount:'50'},'fallback-1');
+  const saved=JSON.parse(map.get('sakhelwe-cloud-sync:'+user));
+  assert.equal(saved.queue.length,1);
+  assert.equal(saved.queue[0].key,'fallback-1');
+  if(originalIdb)Object.defineProperty(globalThis,'indexedDB',originalIdb);
+  else delete globalThis.indexedDB;
+  const migrated=await syncRead(user);
+  assert.equal(migrated.queue.length,1);
+  assert.equal(migrated.queue[0].key,'fallback-1');
+  assert.equal(map.has('sakhelwe-cloud-sync:'+user),false);
+ }finally{
+  if(originalIdb)Object.defineProperty(globalThis,'indexedDB',originalIdb);
+  else delete globalThis.indexedDB;
+  if(originalStorage)Object.defineProperty(globalThis,'localStorage',originalStorage);
+  else delete globalThis.localStorage;
+ }
+});
