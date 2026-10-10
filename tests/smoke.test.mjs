@@ -81,7 +81,7 @@ test("Desktop data loading is bounded and renders cloud data before waiting for 
  assert.match(app,/global:\{fetch:fetchWithTimeout\}/);
  assert.match(app,/db:\{retry:false\}/);
  assert.match(app,/syncSaveWorkspace\(sess\.user\.id,next\)\.catch/);
- assert.match(app,/const refresh=async\(\)=>\{await refreshPending\(\);const before=await syncRead\(sess\.user\.id\)\.catch\(\(\)=>null\);if\(active\)await load\(\)/);
+ assert.ok(app.includes("const refresh=async()=>{await refreshPending();const before=await syncRead(sess.user.id).catch(()=>null);if(active)await load()"));
  assert.match(offlineBuilder,/self\.skipWaiting\(\)/);
  assert.match(offlineBuilder,/self\.clients\.claim\(\)/);
 });
