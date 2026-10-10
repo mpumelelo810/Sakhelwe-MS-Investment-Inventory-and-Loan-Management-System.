@@ -55,7 +55,7 @@ export function demoPost(s,k,p,key){
  if(previous){if(previous.kind!==k||JSON.stringify(previous.payload)!==JSON.stringify(p))throw Error('Request key already used.');return previous.id;}
  const dt=p.date;
  if(!dt||dt>today())throw Error('Choose today or an earlier date.');
- if(s.events.some(e=>e.business_date>dt))throw Error('Record entries in date order.');
+
  const e={id:crypto.randomUUID(),request_key:key,kind:k,business_date:dt,division:'Business',description:p.description||k.replaceAll('_',' '),amount:Number(p.amount||0),payload:p,created_at:new Date().toISOString()};
  const journal=(a,d=0,cr=0)=>s.journal.push({event_id:e.id,account:a,debit:round(d),credit:round(cr)});
  const prod=s.products.find(x=>x.id===p.product_id);
