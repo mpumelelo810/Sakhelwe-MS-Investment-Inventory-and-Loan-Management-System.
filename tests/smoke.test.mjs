@@ -72,5 +72,5 @@ test("Desktop installation and offline reconnect sync are configured",async()=>{
  assert.match(sync,/syncSaveWorkspace/);
  assert.match(manifest,/"display": "standalone"/);
  assert.match(pkg,/"build": "vite build && python3 scripts\/offline-build\.py"/);
- assert.match(offlineBuilder,/dist\/sw\.js/);
+ assert.match(offlineBuilder,/\(dist\/\x27sw\.js\x27\)/);
 });
