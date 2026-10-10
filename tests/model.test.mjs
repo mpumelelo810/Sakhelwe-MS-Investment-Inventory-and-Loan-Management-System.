@@ -4,7 +4,7 @@ test('CSV protects formula-like customer descriptions',()=>{assert.match(csv([['
 test('loan interest compounds at a fixed 30% per month',()=>{assert.equal(interest({principal:1000,interest:0,due_on:'2026-01-01',accrued_through:'2025-12-01'},'2026-01-01'),300);assert.equal(interest({principal:1000,interest:0,due_on:'2026-01-01',accrued_through:'2026-01-01'},'2026-02-01'),300);});
 
 
-import {ageCategory,ageMix,batchProgress,mortalityRate,stockTimeline,empty,addDays} from '../src/model.js';
+import {ageCategory,ageMix,batchProgress,mortalityRate,stockTimeline,empty,addDays,enterpriseMonthlySummary} from '../src/model.js';
 
 test('chicken and pig age bands use the agreed thresholds',()=>{
  assert.equal(ageCategory('Poultry',0),'Chicks');
@@ -93,4 +93,35 @@ test('replayed stock and age mix reconcile with FIFO batch balances',()=>{
  assert.equal(rate.totalDeaths,2);
  assert.equal(rate.batches.find(b=>b.batchId==='b1').deaths,0);
  assert.equal(rate.batches.find(b=>b.batchId==='b2').deaths,2);
+});
+
+test('monthly enterprise report reconciles individual enterprises to the combined total',()=>{
+ const report=enterpriseMonthlySummary({
+  month:'2026-10',
+  events:[
+   {id:'pig-sale',kind:'sale',division:'Pigs',business_date:'2026-10-03',amount:100},
+   {id:'pig-expense',kind:'expense',division:'Pigs',business_date:'2026-10-04',amount:20},
+   {id:'business-income',kind:'income',division:'Business',business_date:'2026-10-05',amount:50},
+   {id:'business-expense',kind:'expense',division:'Business',business_date:'2026-10-06',amount:5},
+   {id:'loan-income',kind:'repay',division:'Loans',business_date:'2026-10-07',amount:10},
+   {id:'loan-expense',kind:'expense',division:'Loans',business_date:'2026-10-08',amount:7},
+   {id:'old-sale',kind:'sale',division:'Pigs',business_date:'2026-09-30',amount:999}
+  ],
+  journal:[
+   {event_id:'pig-sale',account:'cost_of_sales',debit:8,credit:0},
+   {event_id:'loan-income',account:'interest_income',debit:0,credit:3}
+  ],
+  sales:[{sale_date:'2026-10-09',total:200},{sale_date:'2026-09-30',total:500}],
+  batches:[{received_on:'2026-10-01',initial_quantity:100,unit_cost:1}],
+  expenses:[{expense_date:'2026-10-02',amount:10}]
+ });
+ assert.deepEqual(report.rows.map(r=>[r.section,r.revenue,r.costs,r.profit]),[
+  ['Poultry',200,110,90],
+  ['Pigs',100,28,72],
+  ['Business',50,5,45],
+  ['Loans',3,7,-4]
+ ]);
+ assert.equal(report.totalSales,353);
+ assert.equal(report.totalCosts,150);
+ assert.equal(report.totalProfit,203);
 });
