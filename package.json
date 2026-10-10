@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "vite build",
+    "build": "vite build && python3 scripts/offline-build.py",
     "preview": "vite preview --host 0.0.0.0",
     "test": "npm run build && node --test tests/smoke.test.mjs tests/model.test.mjs"
   },
