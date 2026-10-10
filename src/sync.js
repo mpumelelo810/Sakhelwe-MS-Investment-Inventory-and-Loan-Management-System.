@@ -36,24 +36,26 @@ async function change(user,fn){
  let db;
  try{
   db=await openDB();
-  const result=await new Promise((resolve,reject)=>{
-   let answer,failure;
+  const outcome=await new Promise((resolve,reject)=>{
+   let answer,failure,committedDoc;
    let tx;
    try{tx=db.transaction(STORE,'readwrite')}catch(e){reject(e);return}
    const store=tx.objectStore(STORE),r=store.get(user);
    r.onsuccess=()=>{
     try{
      const doc=mergeDocs(r.result||blank(),readLocal(user));
-     answer=fn(doc);store.put(doc,user);
+     answer=fn(doc);store.put(doc,user);committedDoc=structuredClone(doc);
     }catch(e){failure=Object.assign(new Error(e?.message||"Offline queue operation failed."),{cause:e,skipFallback:true});try{tx.abort()}catch{}}
    };
    r.onerror=()=>{failure=r.error;try{tx.abort()}catch{}};
-   tx.oncomplete=()=>resolve(answer);
+   tx.oncomplete=()=>resolve({answer,doc:committedDoc});
    tx.onabort=tx.onerror=()=>reject(failure||tx.error||Error('Local storage transaction failed.'));
   });
-  // Keep a fallback copy until the IndexedDB write has definitely committed.
-  try{if(typeof localStorage!=='undefined')localStorage.removeItem(localKey(user))}catch{}
-  return result;
+  // Mirror the latest committed queue/workspace so a later IndexedDB failure can
+  // fall back to a current copy. Large workspaces or restricted storage may reject
+  // the mirror; IndexedDB remains authoritative when it is available.
+  try{writeLocal(user,outcome.doc)}catch{}
+  return outcome.answer;
  }catch(idbError){
   if(idbError?.skipFallback)throw idbError.cause||idbError;
   const doc=readLocal(user)||blank();let result;
