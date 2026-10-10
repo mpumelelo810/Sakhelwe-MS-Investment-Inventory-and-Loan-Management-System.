@@ -6,7 +6,7 @@ Private recordkeeping for Sakhelwe MS Investments: stock, sales, customers, expe
 
 The app offers **First time? Create owner account**, prefills `sakhelweinvestment@gmail.com`, checks password confirmation and requires email verification. Only that verified email can bootstrap the first owner; other signups receive no business access. Keep Supabase email confirmation enabled.
 
-Custom SMTP is not configured yet. Supabase default email delivery is restricted to project-team addresses, so self-service confirmation and password reset for the business address are currently blocked. Until SMTP is configured, the administrator must create that exact owner account in Supabase Authentication using a password entered privately by the owner and auto-confirm it. The installed trigger grants owner membership automatically. Never put passwords in chat, SQL or GitHub. No owner Auth account existed at the last verification.
+Custom SMTP is not configured yet. Supabase default email delivery is restricted to project-team addresses, so self-service confirmation and password reset may be blocked. An owner-linked Auth account is present in the current production project; do not create a duplicate. If the owner cannot sign in before SMTP is configured, an administrator should recover the existing account through Supabase Authentication. Never put passwords in chat, SQL or GitHub.
 
 Sign in online once on each device using the same account. Extra helpers require separate Auth accounts and explicit staff roles; do not share the owner password.
 
@@ -37,9 +37,9 @@ For a new dedicated database apply, in order: `database/schema.sql`, `database/s
 
 ## Integrity and verification
 
-Server transactions atomically post ledger, stock and audit changes. Exact numeric money, FIFO costing, nonnegative cash, protected staff roles and actor/payload idempotency checks are enforced. All ten public business tables have RLS; writes use controlled RPCs. Sync RPCs bind requests to the expected signed-in user. Security advisors returned no findings after the migrations.
+Server transactions atomically post ledger, stock and audit changes. Exact numeric money, FIFO costing, nonnegative cash, protected staff roles and actor/payload idempotency checks are enforced. All ten public business tables have RLS; writes use controlled RPCs. Sync RPCs bind requests to the expected signed-in user. On 10 October 2026, the audit found that the unused legacy `sakhelwe_apply_loan_interest` RPC could be executed anonymously; the production migration now revokes execute permission from `PUBLIC`, `anon` and `authenticated`, and a verification query confirmed that only the database owner can execute it. Remaining Supabase advisor warnings include leaked-password protection being disabled and three authenticated `SECURITY DEFINER` RPCs; the latter check for authorized staff and are called by the app. Enable leaked-password protection in Supabase Auth settings if the project plan supports it, and do not revoke the app's RPCs without updating and testing the frontend.
 
-All 18 automated tests pass, covering ledger integrity, permissions, verified-owner activation, session changes, offline persistence, reconnect syncing, rejected entries and lost-response retries. Production build passes. Actual owner sign-in and synchronization between two physical devices still require account activation and user verification.
+All 19 automated tests cover ledger calculations, permissions, customer registration, livestock catalogue repair, Excel workbook packaging, offline persistence, reconnect syncing, rejected entries and lost-response retries. The production build passes. Actual browser login and synchronization between two physical devices still require acceptance testing on the live site.
 
 ## Limits
 
