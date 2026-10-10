@@ -84,4 +84,6 @@ test("Desktop data loading is bounded and renders cloud data before waiting for 
  assert.ok(app.includes("const refresh=async()=>{await refreshPending();const before=await syncRead(sess.user.id).catch(()=>null);if(active)await load()"));
  assert.match(offlineBuilder,/self\.skipWaiting\(\)/);
  assert.match(offlineBuilder,/self\.clients\.claim\(\)/);
+ assert.match(app,/Downloaded HTML mode uses separate local storage/);
+ assert.match(app,/Its offline queue is separate from the installed website/);
 });
