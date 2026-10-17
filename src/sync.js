@@ -103,7 +103,7 @@ async function run(user,rpc){
  await change(user,d=>{d.snapshot=snapshot;d.updatedAt=new Date().toISOString()});
  while(true){
   const doc=await syncRead(user),entry=doc.queue[0];if(!entry)break;
-  if(entry.error)throw Error(entry.error);
+  if(entry.error&&!String(entry.error).includes('Choose an existing livestock product.'))throw Error(entry.error);
   try{await rpc('sakhelwe_post',{kind:entry.kind,payload:normalisePayload(entry.payload),request_key:entry.key})}
   catch(e){
    if(e.code&&!['PGRST000','PGRST001','PGRST002','PGRST003','57014','53300','57P01'].includes(e.code)&&!String(e.code).startsWith('08'))
