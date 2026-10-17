@@ -1,5 +1,6 @@
 import test from "node:test";import assert from "node:assert/strict";import{readFile}from"node:fs/promises";
 import {downloadMonthlyExcelReport} from "../src/excelExport.js";
+test("Offline-queueable updates confirm a row was actually updated",async()=>{const s=await readFile("src/main.jsx","utf8");assert.match(s,/update\(values\)\.eq\("id",id\)\.select\("id"\)\.maybeSingle\(\)/);assert.match(s,/The batch was not updated/);});
 test("Sakhelwe uses the Supabase snapshot and transaction RPCs",async()=>{const s=(await Promise.all(["src/main.jsx","src/components.jsx"].map(p=>readFile(p,"utf8")))).join("\n");assert.match(s,/sakhelwe_snapshot/);assert.match(s,/sakhelwe_post/);assert.match(s,/sakhelwe_delete_event/);});
 test("Sakhelwe keeps the essential livestock features",async()=>{const s=(await Promise.all(["src/main.jsx","src/components.jsx"].map(p=>readFile(p,"utf8")))).join("\n");assert.match(s,/age_weeks/);assert.match(s,/mortality/);assert.match(s,/pricing_quantity/);assert.match(s,/Money owed/);});
 
