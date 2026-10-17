@@ -18,11 +18,12 @@ async function reconcileQueuedLivestockProduct(kind,payload){
  const livestockKinds=new Set(["opening_stock","receive","sale","mortality","loss"]);
  if(!livestockKinds.has(kind))return payload;
  const currentId=String(payload?.product_id||"").trim();
+ const division=String(payload?.division||"").trim();
  const catalog=await db.from("sakhelwe_products").select("id,division");
  if(catalog.error)throw catalog.error;
  const products=catalog.data||[];
- if(currentId&&products.some(product=>product.id===currentId))return payload;
- const division=String(payload?.division||"").trim();
+ const currentProduct=products.find(product=>product.id===currentId);
+ if(currentProduct&&(!["Pigs","Poultry"].includes(division)||currentProduct.division===division))return payload;
  if(!["Pigs","Poultry"].includes(division))throw Error("A pending livestock entry references a product that cannot be matched safely. Its entry is still on this device; do not clear the queue.");
  const match=products.find(product=>product.division===division);
  if(!match)throw Error("No current livestock product exists for "+division+". The pending entry is still on this device.");
