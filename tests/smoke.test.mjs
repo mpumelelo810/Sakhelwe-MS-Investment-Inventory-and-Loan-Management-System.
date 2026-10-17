@@ -88,3 +88,12 @@ test("Desktop data loading is bounded and renders cloud data before waiting for 
  assert.match(app,/Downloaded HTML mode uses separate local storage/);
  assert.match(app,/Its offline queue is separate from the installed website/);
 });
+
+test("Pending livestock sync reconciles stale product IDs without discarding queued entries",async()=>{
+ const app=await readFile("src/main.jsx","utf8");
+ assert.match(app,/async function reconcileQueuedLivestockProduct\(kind,payload\)/);
+ assert.match(app,/from\("sakhelwe_products"\)\.select\("id,division"\)/);
+ assert.match(app,/return \{\.\.\.payload,product_id:match\.id\}/);
+ assert.match(app,/payload:normalizedPayload,expected_user_id:user/);
+ assert.match(app,/The pending entry is still on this device/);
+});
