@@ -1,4 +1,4 @@
-import 'fake-indexeddb/auto';import {test} from 'node:test';import assert from 'node:assert/strict';import {syncRead,syncEnqueue,syncRun,syncRetry,syncBackup} from '../src/sync.js';import {empty} from '../src/model.js';
+import 'fake-indexeddb/auto';import {test} from 'node:test';import assert from 'node:assert/strict';import {syncRead,syncEnqueue,syncRun,syncRetry,syncBackup} from '../src/sync.js';import {empty} from '../src/model.js';import {reconcileQueuedLivestockProduct} from '../src/livestock-reconcile.js';
 function server(){let state=empty(),commits=new Map(),fail=null;return {setFail:f=>fail=f,count:()=>commits.size,rpc:async(fn,args)=>{if(fn==='sakhelwe_snapshot')return structuredClone(state);if(fail==='reject')throw Object.assign(Error('Not enough stock'),{code:'P0001'});if(!commits.has(args.request_key)){commits.set(args.request_key,args);state.events.push({id:args.request_key,kind:args.kind,payload:args.payload});}if(fail==='lost'){fail=null;throw Error('Connection lost after commit')}return args.request_key}}}
 test('offline outbox survives reconnect and lost response retries without duplicates',async()=>{const s=server(),user='sync-owner';await syncRun(user,s.rpc);await syncEnqueue(user,'capital',{date:'2026-10-01',amount:'100'},'request-1');s.setFail('lost');await assert.rejects(syncRun(user,s.rpc),/Connection lost/);assert.equal((await syncRead(user)).queue.length,1);assert.equal(s.count(),1);await syncRun(user,s.rpc);assert.equal(s.count(),1);assert.equal((await syncRead(user)).queue.length,0);assert.equal((await syncRead(user)).snapshot.events.length,1);});
 test('conflicts retain pending entries and stop subsequent posting until explicit retry',async()=>{const s=server(),user='sync-conflict';await syncRun(user,s.rpc);await syncEnqueue(user,'sale',{date:'2026-10-01'},'conflict-1');await syncEnqueue(user,'capital',{date:'2026-10-01'},'conflict-2');s.setFail('reject');await assert.rejects(syncRun(user,s.rpc),/Not enough stock/);assert.equal((await syncRead(user)).queue.length,2);s.setFail(null);await assert.rejects(syncRun(user,s.rpc),/Not enough stock/);assert.equal(s.count(),0);await syncRetry(user);await syncRun(user,s.rpc);assert.equal(s.count(),2);});
@@ -40,7 +40,7 @@ test('outbox falls back to persistent localStorage when IndexedDB is unavailable
  }
 });
 
-test('queued livestock product validation errors can retry after catalog reconciliation',async()=>{
+test('outbox retains a stale-product entry after server rejection and removes it only after acceptance',async()=>{
  const s=server(),user='sync-stale-product';
  await syncRun(user,s.rpc);
  await syncEnqueue(user,'sale',{date:'2026-10-01',division:'Pigs',product_id:'stale-product'},'stale-product-1');
@@ -50,4 +50,34 @@ test('queued livestock product validation errors can retry after catalog reconci
  s.rpc=async(fn,args)=>{if(fn==='sakhelwe_snapshot')return empty();return args.request_key};
  await syncRun(user,s.rpc);
  assert.equal((await syncRead(user)).queue.length,0);
+});
+
+
+test('stale pig product IDs reconcile to the current product for the same division',()=>{
+ const payload={date:'2026-10-01',division:'Pigs',product_id:'deleted-pig-id',quantity:'1'};
+ const result=reconcileQueuedLivestockProduct('opening_stock',payload,[{id:'live-pigs-current',division:'Pigs'},{id:'chicken-current',division:'Poultry'}]);
+ assert.deepEqual(result,{...payload,product_id:'live-pigs-current'});
+ assert.equal(payload.product_id,'deleted-pig-id','reconciliation must not mutate the queued payload object');
+});
+
+test('a product ID belonging to the wrong division is reconciled to the requested division',()=>{
+ const result=reconcileQueuedLivestockProduct('sale',{division:'Pigs',product_id:'chicken-current'},[{id:'chicken-current',division:'Poultry'},{id:'pig-current',division:'Pigs'}]);
+ assert.equal(result.product_id,'pig-current');
+});
+
+test('a valid product in the correct division is preserved unchanged',()=>{
+ const payload={division:'Pigs',product_id:'pig-current',quantity:'2'};
+ assert.equal(reconcileQueuedLivestockProduct('sale',payload,[{id:'pig-current',division:'Pigs'}]),payload);
+});
+
+test('missing matching livestock product throws without changing or discarding the entry',()=>{
+ const payload={division:'Pigs',product_id:'deleted-pig-id',quantity:'1'};
+ assert.throws(()=>reconcileQueuedLivestockProduct('opening_stock',payload,[{id:'chicken-current',division:'Poultry'}]),/No current livestock product exists for Pigs/);
+ assert.equal(payload.product_id,'deleted-pig-id');
+});
+
+test('unknown division fails safely and non-livestock records bypass product reconciliation',()=>{
+ assert.throws(()=>reconcileQueuedLivestockProduct('sale',{division:'Business',product_id:'stale'},[]),/cannot be matched safely/);
+ const payload={division:'Business',product_id:'stale'};
+ assert.equal(reconcileQueuedLivestockProduct('capital',payload,[]),payload);
 });
