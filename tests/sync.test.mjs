@@ -39,3 +39,15 @@ test('outbox falls back to persistent localStorage when IndexedDB is unavailable
   else delete globalThis.localStorage;
  }
 });
+
+test('queued livestock product validation errors can retry after catalog reconciliation',async()=>{
+ const s=server(),user='sync-stale-product';
+ await syncRun(user,s.rpc);
+ await syncEnqueue(user,'sale',{date:'2026-10-01',division:'Pigs',product_id:'stale-product'},'stale-product-1');
+ s.rpc=async(fn,args)=>{if(fn==='sakhelwe_snapshot')return empty();throw Object.assign(Error('Choose an existing livestock product.'),{code:'P0001'})};
+ await assert.rejects(syncRun(user,s.rpc),/Choose an existing livestock product/);
+ assert.equal((await syncRead(user)).queue.length,1);
+ s.rpc=async(fn,args)=>{if(fn==='sakhelwe_snapshot')return empty();return args.request_key};
+ await syncRun(user,s.rpc);
+ assert.equal((await syncRead(user)).queue.length,0);
+});
