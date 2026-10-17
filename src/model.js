@@ -345,3 +345,29 @@ export const enterpriseMonthlySummary=({month,events=[],journal=[],sales=[],batc
  const totalSales=rows.reduce((n,r)=>n+r.revenue,0),totalCosts=rows.reduce((n,r)=>n+r.costs,0);
  return{month,rows,totalSales,totalCosts,totalProfit:totalSales-totalCosts};
 };
+
+
+/**
+ * Lifetime business summary across all confirmed records, regardless of the
+ * currently selected reporting month. Profit is always income minus expenses.
+ * Chicken batch purchase costs and chicken-specific expenses are included once;
+ * livestock cost of sales and recorded operating expenses come from the ledger.
+ */
+export const enterpriseLifetimeSummary=({events=[],journal=[],sales=[],batches=[],expenses=[]})=>{
+ const rows=["Poultry","Pigs","Business","Loans"].map(section=>{
+  const es=events.filter(e=>String(e.division||"Business").toLowerCase()===section.toLowerCase()||(section==="Poultry"&&["Chicken","Chickens"].includes(e.division)));
+  const ids=new Set(es.map(e=>e.id)),sj=journal.filter(x=>ids.has(x.event_id));
+  const genericIncome=es.filter(e=>e.kind==="sale"||e.kind==="income").reduce((n,e)=>n+Number(e.amount||0),0);
+  const operatingExpenses=es.filter(e=>e.kind==="expense").reduce((n,e)=>n+Number(e.amount||0),0);
+  const costOfSales=sj.filter(x=>x.account==="cost_of_sales").reduce((n,x)=>n+Number(x.debit||0)-Number(x.credit||0),0);
+  const interestIncome=sj.filter(x=>x.account==="interest_income").reduce((n,x)=>n+Number(x.credit||0)-Number(x.debit||0),0);
+  const poultryIncome=sales.reduce((n,x)=>n+Number(x.total||0),0);
+  const batchCosts=batches.reduce((n,b)=>n+Number(b.initial_quantity||0)*Number(b.unit_cost||0),0);
+  const poultryExpenses=expenses.reduce((n,x)=>n+Number(x.amount||0),0);
+  const income=(section==="Poultry"?poultryIncome+genericIncome:section==="Loans"?interestIncome+genericIncome:genericIncome);
+  const costs=(section==="Poultry"?batchCosts+poultryExpenses+operatingExpenses+costOfSales:operatingExpenses+costOfSales);
+  return{section,income,expenses:costs,profit:income-costs};
+ });
+ const totalIncome=rows.reduce((n,r)=>n+r.income,0),totalExpenses=rows.reduce((n,r)=>n+r.expenses,0);
+ return{rows,totalIncome,totalExpenses,profitLoss:totalIncome-totalExpenses};
+};

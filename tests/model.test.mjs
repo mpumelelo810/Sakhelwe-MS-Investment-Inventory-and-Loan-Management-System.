@@ -125,3 +125,29 @@ test('monthly enterprise report reconciles individual enterprises to the combine
  assert.equal(report.totalCosts,150);
  assert.equal(report.totalProfit,203);
 });
+
+
+import { enterpriseLifetimeSummary } from '../src/model.js';
+
+test('lifetime totals include records from every date and profit is income minus expenses',()=>{
+ const result=enterpriseLifetimeSummary({
+  events:[
+   {id:'old-pig-sale',kind:'sale',division:'Pigs',business_date:'2025-01-03',amount:300},
+   {id:'old-pig-expense',kind:'expense',division:'Pigs',business_date:'2025-01-04',amount:40},
+   {id:'business-income',kind:'income',division:'Business',business_date:'2026-10-01',amount:80},
+   {id:'business-expense',kind:'expense',division:'Business',business_date:'2026-10-02',amount:10},
+   {id:'loan-event',kind:'repay',division:'Loans',business_date:'2026-10-03',amount:50}
+  ],
+  journal:[
+   {event_id:'old-pig-sale',account:'cost_of_sales',debit:25,credit:0},
+   {event_id:'loan-event',account:'interest_income',debit:0,credit:12}
+  ],
+  sales:[{sale_date:'2025-02-01',total:200},{sale_date:'2026-10-04',total:100}],
+  batches:[{received_on:'2025-01-01',initial_quantity:10,unit_cost:5},{received_on:'2026-10-01',initial_quantity:20,unit_cost:4}],
+  expenses:[{expense_date:'2025-01-02',amount:15},{expense_date:'2026-10-02',amount:5}]
+ });
+ assert.equal(result.totalIncome,692);
+ assert.equal(result.totalExpenses,225);
+ assert.equal(result.profitLoss,467);
+ assert.equal(result.profitLoss,result.totalIncome-result.totalExpenses);
+});
