@@ -19,6 +19,8 @@ test('live and dressed sales are labelled and deducted from the matching stock',
   assert.match(components, /dressedSales=ss\.filter\(x=>x\.sale_type==="dressed"\)/);
   assert.match(components, /x\.sale_type==="live"\?"live\/undressed":"dressed"/);
   assert.match(main, /p_sale_type:x\.sale_type\|\|"live"/);
+  assert.match(main, /liveSales=\(d\.chickenSales\|\|\[\]\)\.filter\(v=>v\.batch_id===x\.batch_id&&v\.sale_type==="live"\)/);
+  assert.match(main, /remaining=Number\(b\.initial_quantity\)-dead-salesTotal/);
 });
 
 test('database sale function validates stock for the chosen type and stores that type', () => {
