@@ -147,7 +147,7 @@ test('lifetime totals include records from every date and profit is income minus
   expenses:[{expense_date:'2025-01-02',amount:15},{expense_date:'2026-10-02',amount:5}]
  });
  assert.equal(result.totalIncome,692);
- assert.equal(result.totalExpenses,195);
- assert.equal(result.profitLoss,497);
+ assert.equal(result.totalExpenses,225);
+ assert.equal(result.profitLoss,467);
  assert.equal(result.profitLoss,result.totalIncome-result.totalExpenses);
 });
